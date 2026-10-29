@@ -1,3 +1,4 @@
 build/
 gschemas.compiled
 *.zip
+__pycache__/

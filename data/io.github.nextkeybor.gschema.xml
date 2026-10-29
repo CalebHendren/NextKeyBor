@@ -50,6 +50,10 @@
       <default>true</default>
       <summary>Insert a space after picking a suggestion</summary>
     </key>
+    <key name="double-space-period" type="b">
+      <default>true</default>
+      <summary>Double-tap the space bar to type a period and a space</summary>
+    </key>
     <key name="learn-words" type="b">
       <default>true</default>
       <summary>Learn words you type (stored locally only)</summary>
@@ -146,7 +150,7 @@
 
     <!-- Physical keyboard detection -->
     <key name="auto-toggle-osk" type="b">
-      <default>true</default>
+      <default>false</default>
       <summary>Enable the OSK only when no physical keyboard is usable</summary>
     </key>
     <key name="hide-osk-on-typing" type="b">

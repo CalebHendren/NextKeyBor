@@ -28,6 +28,7 @@ export const MAX_HEIGHT_RATIO = 0.62;
 const SWIPE_CHOICES = 4;
 const SCREENSHOT_DELAY_MS = 250;
 const KEY_GAP_MS = 15;
+const DOUBLE_SPACE_MS = 1000;
 const BOUNCE_MARGIN_MS = 30;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
@@ -558,8 +559,14 @@ export class KeyboardUi {
                 this._panel.typeText(str);
                 return Promise.resolve();
             }
-            this._swipeResult = null;
             const plain = !modifiers || modifiers.size === 0;
+            // Double-tap space after a word: replace the first space with ". ".
+            if (plain && str === ' ' && this._isDoubleSpace()) {
+                this._swipeResult = null;
+                this._replaceBeforeCursor(1, '. ');
+                return Promise.resolve();
+            }
+            this._swipeResult = null;
             const promise = this._orig.commit.call(ctrl, str, modifiers);
             if (plain)
                 this._onTextCommitted(str);
@@ -684,6 +691,14 @@ export class KeyboardUi {
         } else {
             press();
         }
+    }
+
+    _isDoubleSpace() {
+        if (!this._settings.get_boolean('double-space-period') ||
+            this._isTerminal() || this._isPassword())
+            return false;
+        const sinceMs = (GLib.get_monotonic_time() - this._lastCommitTime) / 1000;
+        return sinceMs < DOUBLE_SPACE_MS && /[\p{L}\p{N})"'”’] $/u.test(this._context());
     }
 
     // Commit into the focused app regardless of captured typing.
