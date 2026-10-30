@@ -175,9 +175,24 @@ class KeyboardIndicator extends PanelMenu.Button {
 
     destroy() {
         this._settings.disconnectObject(this);
+        restoreA11y();
         super.destroy();
     }
 });
+
+// Set while the accessibility setting is on only because the top bar button
+// switched it on. GNOME opens an enabled keyboard on every focused text field
+// (lock screen, Wi-Fi password…) even with a physical keyboard attached, so
+// switch it off again once the keyboard hides.
+let a11yEnabledByUs = null;
+
+function restoreA11y() {
+    if (!a11yEnabledByUs)
+        return;
+    Main.keyboard.disconnectObject(a11yEnabledByUs);
+    a11yEnabledByUs.set_boolean('screen-keyboard-enabled', false);
+    a11yEnabledByUs = null;
+}
 
 function toggleKeyboard() {
     const kb = Main.keyboard;
@@ -186,10 +201,15 @@ function toggleKeyboard() {
         return;
     }
     // The keyboard only exists while it is enabled (touch mode or the
-    // accessibility setting); switch it on if needed.
-    if (!kb._keyboard) {
-        const a11y = kb._a11yApplicationsSettings;
-        a11y?.set_boolean('screen-keyboard-enabled', true);
+    // accessibility setting); switch it on if needed, until it hides.
+    const a11y = kb._a11yApplicationsSettings;
+    if (!kb._keyboard && a11y && !a11y.get_boolean('screen-keyboard-enabled')) {
+        a11y.set_boolean('screen-keyboard-enabled', true);
+        a11yEnabledByUs = a11y;
+        kb.connectObject('visibility-changed', () => {
+            if (!kb.visible)
+                restoreA11y();
+        }, a11y);
     }
     const open = () => kb.open(Main.layoutManager.primaryIndex);
     if (kb._keyboard) {

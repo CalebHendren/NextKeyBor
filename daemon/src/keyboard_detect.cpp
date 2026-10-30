@@ -4,6 +4,8 @@
 #include <map>
 #include <set>
 
+#include <cerrno>
+
 #include <fcntl.h>
 #include <linux/input.h>
 #include <sys/ioctl.h>
@@ -77,6 +79,7 @@ private:
     double last_typing_off_ = 0;
     std::set<int> pending_rescans_;
     std::string last_state_;
+    int denied_ = 0;  // nodes we may not open (user not in the "input" group)
 };
 
 bool is_ignored(const std::string &name) {
@@ -89,8 +92,11 @@ bool is_ignored(const std::string &name) {
 
 bool Detector::add(const std::string &path) {
     int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-    if (fd < 0)
+    if (fd < 0) {
+        if (errno == EACCES || errno == EPERM)
+            denied_++;
         return false;  // not readable yet, or not ours; a delayed rescan retries
+    }
 
     Device d;
     d.path = path;
@@ -147,6 +153,7 @@ bool Detector::drop(const std::string &path) {
 }
 
 bool Detector::rescan() {
+    denied_ = 0;
     std::set<std::string> present;
     if (GDir *dir = g_dir_open("/dev/input", 0, nullptr)) {
         while (const gchar *n = g_dir_read_name(dir))
@@ -255,6 +262,12 @@ std::vector<const Device *> Detector::usable_keyboards() const {
 void Detector::apply(bool osk_on, const std::string &reason, const std::string &detail, bool notify_always) {
     if (!manage_ || !a11y_ || !setting_bool("auto-toggle-osk", true))
         return;
+    // A keyboard may be among the devices we cannot read; never turn the OSK
+    // on from a guess (it would then open on the lock screen and in dialogs).
+    if (osk_on && denied_ && usable_keyboards().empty()) {
+        g_message("not enabling the OSK (%s): %d input devices unreadable", reason.c_str(), denied_);
+        return;
+    }
     bool current = osk_enabled();
     if (current != osk_on) {
         g_settings_set_boolean(a11y_, kOskKey, osk_on);
@@ -322,6 +335,7 @@ json Detector::state() const {
     return {{"physical", names},
             {"devices", all},
             {"tablet_mode", tablet_mode_},
+            {"unreadable_devices", denied_},
             {"osk_enabled", osk_enabled()},
             {"auto_toggle", setting_bool("auto-toggle-osk", true) && manage_}};
 }
