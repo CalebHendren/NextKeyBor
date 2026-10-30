@@ -1212,6 +1212,8 @@ export class KeyboardUi {
         this._autocorrect = null;
         this._replaceBeforeCursor([...partial].length, ac.fix + sep);
         this._corrected = {original: partial, fix: ac.fix, sep};
+        // "teh" + space + "." should give "the. ", as after a suggestion.
+        this._autoSpace = sep === ' ';
         return true;
     }
 
