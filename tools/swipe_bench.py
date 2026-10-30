@@ -26,7 +26,8 @@ CORE = ("the and you that this with have from what about would there their think
         "people because thanks great today keyboard typing world hello good know love time when "
         "where which could should little before after something nothing tomorrow minute please "
         "quick question school student microbiology teacher class water friend family house "
-        "maybe yes not now new was were they them then than our out").split()
+        "maybe yes not now new was were they them then than our out "
+        "Reddit YouTube TikTok").split()
 
 
 def key_centres(row_step):
@@ -37,7 +38,7 @@ def key_centres(row_step):
 def letter_targets(word, keys):
     """Key centres in order, with repeated letters as one stop."""
     pts = []
-    for c in word:
+    for c in word.lower():
         k = keys[c]
         if not pts or pts[-1] != k:
             pts.append(k)

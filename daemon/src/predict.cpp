@@ -24,6 +24,7 @@ struct Entry {
     double base;        // dictionary score
     bool stem = false;  // in the hunspell word list (a real word, not just a frequent token)
     size_t rank = 0;    // place in the frequency list (1 = most common), 0 if not in it
+    bool extra = false; // from kEnglishExtras: a name worth offering as is
 };
 
 class Model {
@@ -69,6 +70,17 @@ private:
 };
 
 constexpr size_t kUnranked = 100000;  // the rank given to dictionary words missing from the frequency list
+constexpr size_t kExtraRank = 8000;   // and the rank given to kEnglishExtras
+
+// Words people type far more than films say them, which hunspell lacks or
+// the subtitle frequency list ranks too low: without them "Reddit" swipes
+// as "geddit". Spelled as they should be written.
+const char *const kEnglishExtras[] = {
+    "Reddit", "subreddit", "subreddits", "upvote", "upvoted", "downvote", "TikTok", "WhatsApp", "Spotify",
+    "Snapchat", "LinkedIn", "Gmail", "ChatGPT", "Pinterest", "Tumblr", "Venmo", "Airbnb", "Lyft", "DoorDash",
+    "Xbox", "Minecraft", "Roblox", "Etsy", "Hulu", "iCloud", "macOS", "Siri", "YouTube", "YouTuber", "apps",
+    "memes", "emojis", "omg", "idk", "tbh",
+};
 
 std::map<std::string, std::unique_ptr<Model>> g_models;
 std::string g_active;
@@ -261,6 +273,16 @@ void Model::build() {
             }
         }
     }
+
+    if (freq_code() == "en")
+        for (const char *w : kEnglishExtras) {
+            std::string key = fold(w);
+            Entry &e = words.try_emplace(key, Entry{key, w, 1.0, true}).first->second;
+            e.word = w;
+            e.rank = e.rank ? std::min(e.rank, kExtraRank) : kExtraRank;
+            e.base = std::max(e.base, 10.0 + 1000.0 / (1.0 + static_cast<double>(e.rank) / 20.0));
+            e.extra = true;
+        }
 
     // Words only the user has typed (twice or more) join the vocabulary.
     for (auto &[w, c] : user_["unigrams"].items()) {
@@ -887,7 +909,7 @@ std::vector<std::string> Model::swipe(const std::string &context, const std::map
                     p += b->get<double>() / 20.0;
             }
             double prior = kSwipeFreqWeight * std::log(p);
-            if ((capital || acronym) && !typed.contains(e.word))
+            if ((capital || acronym) && !e.extra && !typed.contains(e.word))
                 prior -= kSwipeNamePenalty;  // names ("Abbas") and acronyms ("US", "FSF")
             candidates.push_back({prior, &e, begin, stops.size()});
         }
