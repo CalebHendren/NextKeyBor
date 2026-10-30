@@ -13,6 +13,8 @@ const PROVIDERS = [['openverse', 'Openverse (no key)'], ['giphy', 'GIPHY'], ['kl
 const RATINGS = [['g', 'G'], ['pg', 'PG'], ['pg-13', 'PG-13'], ['r', 'R']];
 const ENGINES = [['auto', 'Automatic'], ['whisper', 'On this computer (whisper.cpp)'], ['groqtype', 'GroqType (Groq cloud)']];
 const GROQTYPE_URL = 'https://github.com/dixonSolutions/GroqType';
+const GIPHY_KEY_URL = 'https://developers.giphy.com/dashboard/?create=true';
+const KLIPY_KEY_URL = 'https://partner.klipy.com/';
 
 // GroqType's CLI, wherever its installer put it.
 function groqtypePath() {
@@ -85,6 +87,16 @@ function entryRow(settings, key, title, password = false) {
         ? new Adw.PasswordEntryRow({title})
         : new Adw.EntryRow({title});
     settings.bind(key, row, 'text', Gio.SettingsBindFlags.DEFAULT);
+    return row;
+}
+
+// A button on a row that opens a web page, e.g. where to get an API key.
+function addLink(row, label, uri) {
+    const button = new Gtk.Button({label, valign: Gtk.Align.CENTER, tooltip_text: uri});
+    button.add_css_class('flat');
+    button.connect('clicked', () =>
+        new Gtk.UriLauncher({uri}).launch(row.get_root(), null, null));
+    row.add_suffix(button);
     return row;
 }
 
@@ -297,12 +309,12 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         window.add(gifs);
         const prov = new Adw.PreferencesGroup({
             title: 'Online GIFs and stickers',
-            description: 'Openverse works without a key but has few reaction GIFs. For GIPHY or KLIPY, get a free key at developers.giphy.com or partner.klipy.com; until a key is set, searches use Openverse. Favourites and your own GIFs work offline.',
+            description: 'Openverse works without a key but has few reaction GIFs. For GIPHY or KLIPY, use Get a key to sign up and create one; until a key is set, searches use Openverse. Google shut down the Tenor API on June 30, 2026, so Tenor keys no longer work. Favourites and your own GIFs work offline.',
         });
         prov.add(comboRow(settings, 'gif-provider', 'Provider', PROVIDERS));
-        prov.add(entryRow(settings, 'giphy-api-key', 'GIPHY API key', true));
-        prov.add(entryRow(settings, 'klipy-api-key', 'KLIPY API key', true));
-        prov.add(entryRow(settings, 'tenor-api-key', 'Tenor API key', true));
+        prov.add(addLink(entryRow(settings, 'giphy-api-key', 'GIPHY API key', true), 'Get a key', GIPHY_KEY_URL));
+        prov.add(addLink(entryRow(settings, 'klipy-api-key', 'KLIPY API key', true), 'Get a key', KLIPY_KEY_URL));
+        prov.add(entryRow(settings, 'tenor-api-key', 'Tenor API key (discontinued)', true));
         prov.add(comboRow(settings, 'gif-content-rating', 'Content rating', RATINGS));
         prov.add(spinRow(settings, 'gif-cache-mb', 'Cache size (MB)', 20, 5000));
         gifs.add(prov);
