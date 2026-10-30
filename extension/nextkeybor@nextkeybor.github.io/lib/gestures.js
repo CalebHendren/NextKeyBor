@@ -4,6 +4,9 @@
 //   is held, as on iOS and Gboard (setting key-popups);
 // - space-bar cursor: sliding along the space bar moves the text cursor
 //   instead of typing a space (setting space-cursor);
+// - backspace swipe: sliding left from the backspace key picks whole words
+//   to delete, sliding back right fewer, and lifting deletes them, as on
+//   Gboard (setting backspace-swipe);
 // - double-tap shift for caps lock (stock GNOME only latches on long-press);
 // - a click sound on each key press (setting key-sound; played through
 //   GNOME's sound player, so it follows the system's alert sound settings).
@@ -22,11 +25,17 @@ const CURSOR_STEP = 0.35; // and then by one character per this much
 const DOUBLE_TAP_MS = 350;
 const POPUP_WIDTH = 1.3; // popup size, relative to the key
 const POPUP_HEIGHT = 1.5;
+const DELETE_START = 0.5; // a backspace touch picks words after this much travel left (in key widths)
+const DELETE_STEP = 0.6; // and then one more word per this much
 
 // The stock Key (a St.BoxLayout) around a key button, or null.
 function keyOf(actor) {
     const key = actor?.get_parent();
     return key && key.keyButton === actor && typeof key.cancel === 'function' ? key : null;
+}
+
+function isDeleteKey(key) {
+    return key._icon?.icon_name === 'osk-delete-symbolic';
 }
 
 function isShiftKey(key) {
@@ -37,14 +46,17 @@ function isShiftKey(key) {
 export class KeyGestures {
     // enabled(): false while a panel replaces the keys and the like.
     // moveCursor(keyval): send one Left/Right; cursorMoved(): the drag ended.
-    // soundFile: a Gio.File with the click sound.
-    constructor(keyboard, {settings, enabled, moveCursor, cursorMoved, soundFile = null}) {
+    // deleteWords: {start() -> how many words can go, pick(n), finish(n)}
+    // for the backspace swipe. soundFile: a Gio.File with the click sound.
+    constructor(keyboard, {settings, enabled, moveCursor, cursorMoved, deleteWords, soundFile = null}) {
         this._kb = keyboard;
         this._soundFile = soundFile;
         this._settings = settings;
         this._enabled = enabled;
         this._moveCursor = moveCursor;
         this._cursorMoved = cursorMoved;
+        this._deleteWords = deleteWords;
+        this._delete = null; // {slot, key, anchor, dragging, max, words}
         this._popup = null;
         this._popupSlot = null;
         this._space = null; // {slot, key, anchor, unit, dragging}
@@ -61,12 +73,14 @@ export class KeyGestures {
         this._latchId = 0;
         this.hidePopup();
         this._space = null;
+        this._delete = null;
     }
 
     // Drop the touch being watched, if any (its key is going away).
     reset() {
         this.hidePopup();
         this._space = null;
+        this._endDelete(false);
     }
 
     _onEvent(event) {
@@ -87,6 +101,9 @@ export class KeyGestures {
             if (label === ' ') {
                 if (this._settings.get_boolean('space-cursor'))
                     this._space = {slot, key, anchor: event.get_coords()[0], dragging: false};
+            } else if (isDeleteKey(key)) {
+                if (this._settings.get_boolean('backspace-swipe'))
+                    this._delete = {slot, key, anchor: event.get_coords()[0], dragging: false, max: 0, words: 0};
             } else if (label && [...label].length === 1 && this._settings.get_boolean('key-popups')) {
                 this._showPopup(key, label, slot);
             }
@@ -100,6 +117,15 @@ export class KeyGestures {
             this._space = null;
             if (dragged)
                 this._cursorMoved();
+            return Clutter.EVENT_PROPAGATE;
+        }
+
+        if (this._delete?.slot === slot) {
+            if (type === T.TOUCH_UPDATE)
+                return this._dragDelete(event.get_coords()[0]);
+            this._endDelete(type === T.TOUCH_END);
+            // The key still sees the end and reports a tap, which
+            // KeyboardUi ignores after a backspace swipe.
             return Clutter.EVENT_PROPAGATE;
         }
 
@@ -190,11 +216,45 @@ export class KeyGestures {
         return Clutter.EVENT_STOP;
     }
 
+    // ---- backspace swipe ---------------------------------------------------
+
+    _dragDelete(x) {
+        const d = this._delete;
+        const unit = this._keyWidth(d.key);
+        const travel = d.anchor - x - DELETE_START * unit;
+        if (!d.dragging) {
+            // Not once holding has started deleting letters one by one.
+            if (travel < 0 || d.key._pressTimeoutId === 0)
+                return Clutter.EVENT_PROPAGATE;
+            d.dragging = true;
+            // Stop the press (and its repeat) without deleting a letter.
+            d.key.cancel();
+            d.key._pressed = false;
+            d.max = this._deleteWords.start();
+        }
+        const words = travel < 0 ? 0 : Math.min(Math.floor(travel / (DELETE_STEP * unit)) + 1, d.max);
+        if (words !== d.words) {
+            d.words = words;
+            this._deleteWords.pick(words);
+        }
+        return Clutter.EVENT_STOP;
+    }
+
+    // Lifting the finger (commit) deletes the words picked.
+    _endDelete(commit) {
+        const d = this._delete;
+        this._delete = null;
+        if (!d?.dragging)
+            return;
+        d.key.keyButton.remove_style_pseudo_class('active');
+        this._deleteWords.finish(commit ? d.words : 0);
+    }
+
     // Width of a letter key, the unit for drag distances.
-    _keyWidth() {
-        const key = this._space?.key;
+    _keyWidth(key = this._space?.key) {
         const [, height] = key?.keyButton.get_transformed_size() ?? [0, 0];
-        // The space bar is wide; letter keys are about as wide as it is tall.
+        // The space bar and backspace are wide; letter keys are about as
+        // wide as they are tall.
         return height || 40;
     }
 

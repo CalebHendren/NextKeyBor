@@ -91,6 +91,10 @@
       <default>true</default>
       <summary>Slide along the space bar to move the text cursor</summary>
     </key>
+    <key name="backspace-swipe" type="b">
+      <default>true</default>
+      <summary>Slide left from the backspace key to delete whole words</summary>
+    </key>
     <key name="key-sound" type="b">
       <default>false</default>
       <summary>Play a click on each key press</summary>

@@ -36,6 +36,8 @@ const KEY_GAP_MS = 15;
 const DOUBLE_SPACE_MS = 1000;
 const BOUNCE_MARGIN_MS = 30;
 const SPLIT_CHECK_MS = 250;
+const MAX_DELETE_WORDS = 30;
+const DELETE_TAP_MS = 300;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
 // The word just finished with a space, for emoji suggestions.
@@ -49,6 +51,22 @@ const TERMINAL_WM_CLASS = /term|console|ptyxis|kitty|alacritty|wezterm|foot|kons
 
 function lastWord(text) {
     return text.match(WORD_TAIL)[0];
+}
+
+// How many characters before the end of text the last 1, 2, ... words
+// take, each with the spaces after it, up to max words.
+function wordEnds(text, max) {
+    const chars = [...text];
+    const ends = [];
+    let i = chars.length;
+    while (ends.length < max && i > 0) {
+        while (i > 0 && /\s/u.test(chars[i - 1]))
+            i--;
+        while (i > 0 && !/\s/u.test(chars[i - 1]))
+            i--;
+        ends.push(chars.length - i);
+    }
+    return ends;
 }
 
 function matchCase(word, partial) {
@@ -94,6 +112,8 @@ export class KeyboardUi {
         this._capDeleteDown = false;
         this._swallowRelease = false;
         this._deletePressTime = 0;
+        this._ignoreDeleteUntil = 0;
+        this._deleteEnds = null; // see _startWordDelete
         this._dictation = {id: null, state: 'idle'};
         this.extraHeight = 0;
 
@@ -133,6 +153,11 @@ export class KeyboardUi {
                 this._pressKeys([keyval]);
             },
             cursorMoved: () => this._resetText(),
+            deleteWords: {
+                start: () => this._startWordDelete(),
+                pick: n => this._pickWordDelete(n),
+                finish: n => this._finishWordDelete(n),
+            },
             soundFile,
         });
 
@@ -254,6 +279,52 @@ export class KeyboardUi {
     resetGestures() {
         this._swipe.reset();
         this._gestures.reset();
+    }
+
+    // ---- backspace swipe ---------------------------------------------------
+
+    // A slide left from backspace began: returns how many words it can
+    // delete. Without the text (terminals, apps that do not report it) the
+    // words are deleted blind, with Ctrl+Backspace.
+    _startWordDelete() {
+        this._settleSwipe();
+        this._corrected = null;
+        const context = this._context();
+        this._deleteEnds = context ? wordEnds(context, MAX_DELETE_WORDS) : null;
+        return this._deleteEnds?.length ?? MAX_DELETE_WORDS;
+    }
+
+    // Show what lifting the finger will delete.
+    _pickWordDelete(n) {
+        if (n === 0) {
+            this._syncMic();
+            return;
+        }
+        const ends = this._deleteEnds;
+        if (ends) {
+            const chars = [...this._context()];
+            const text = chars.slice(chars.length - ends[n - 1]).join('').trim();
+            this._showToolbarStatus(`Delete “${text}”`);
+        } else {
+            this._showToolbarStatus(n === 1 ? 'Delete 1 word' : `Delete ${n} words`);
+        }
+    }
+
+    _finishWordDelete(n) {
+        this._ignoreDeleteUntil = GLib.get_monotonic_time() + DELETE_TAP_MS * 1000;
+        this._syncMic();
+        const ends = this._deleteEnds;
+        this._deleteEnds = null;
+        if (n === 0)
+            return;
+        this._autoSpace = false;
+        this._kb._nkbLastCommit = null;
+        if (ends) {
+            this._replaceBeforeCursor(ends[n - 1], '');
+        } else {
+            this._resetText();
+            this._pressKeys(new Array(n).fill({keyval: Clutter.KEY_BackSpace, modifiers: [Clutter.KEY_Control_L]}));
+        }
     }
 
     // ---- split keyboard ----------------------------------------------------
@@ -703,6 +774,9 @@ export class KeyboardUi {
         };
 
         ctrl.toggleDelete = enabled => {
+            // The backspace key's own tap at the end of a backspace swipe.
+            if (GLib.get_monotonic_time() < this._ignoreDeleteUntil)
+                return;
             if (this._panel?.capturesTyping) {
                 if (enabled && !this._capDeleteDown)
                     this._panel.backspace();

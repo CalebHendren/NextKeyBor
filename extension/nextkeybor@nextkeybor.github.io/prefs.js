@@ -235,6 +235,8 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
             'A click on each key press; silent when alert sounds are off in Settings \u2192 Sound'));
         holds.add(switchRow(settings, 'space-cursor', 'Move the cursor with the space bar',
             'Slide along the space bar to move the text cursor'));
+        holds.add(switchRow(settings, 'backspace-swipe', 'Delete words by sliding from backspace',
+            'Slide left from the backspace key to pick words to delete, back right for fewer; lift to delete'));
         holds.add(switchRow(settings, 'swipe-log', 'Log swipes to improve swipe typing',
             'Keeps your swipes and the words you meant in ~/.local/share/nextkeybor; never sent anywhere'));
         holds.add(switchRow(settings, 'clipboard-history', 'Clipboard history',

@@ -175,9 +175,12 @@ export class SwipeTyper {
             if (this._slot !== null || !this._enabled())
                 return Clutter.EVENT_PROPAGATE;
             // A finger often lands in the gap between keys: a swipe may
-            // start there too, from the nearest letter key.
-            const pressed = letterKeyOf(global.stage.get_event_actor(event));
-            const key = pressed ?? this._nearestLetterKey(x, y);
+            // start there too, from the nearest letter key (but not from
+            // another key, such as backspace, which has slides of its own).
+            const actor = global.stage.get_event_actor(event);
+            const pressed = letterKeyOf(actor);
+            const onKey = actor?.get_parent()?.keyButton === actor;
+            const key = pressed ?? (onKey ? null : this._nearestLetterKey(x, y));
             if (key && this._kb.contains(key)) {
                 this._slot = slot;
                 this._key = key;
