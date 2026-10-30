@@ -13,7 +13,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {waitForSignal} from './daemon.js';
 import {EmojiPanel, LanguagePanel, MediaPanel} from './panels.js';
 import {KeyGestures} from './gestures.js';
-import {SwipeTyper} from './swipe.js';
+import {SwipeTyper, letterKeyCentres} from './swipe.js';
 import {connectTap, iconButton, labelButton, setChecked} from './widgets.js';
 
 const MAX_SUGGESTIONS = 3;
@@ -99,6 +99,7 @@ export class KeyboardUi {
         this._corrected = null; // {original, fix, sep} of the correction just made
         this._keepWord = ''; // a word whose correction was undone
         this._autoSpace = false; // the last character typed is a space we added (suggestion, swipe)
+        this._sentLayout = ''; // the key layout last sent to the daemon, as JSON
 
         this._buildToolbar();
         this._buildResizeHandle();
@@ -859,6 +860,7 @@ export class KeyboardUi {
                 this._addSuggestionButton(word, word, false, () => this._replaceSwipe(word));
             return;
         }
+        this._sendKeyLayout();
         const context = this._context();
         const partial = lastWord(context);
         const [words, fix] = await Promise.all([
@@ -883,6 +885,23 @@ export class KeyboardUi {
         shown.slice(0, MAX_SUGGESTIONS - (corrected ? 1 : 0)).forEach((label, i) => {
             this._addSuggestionButton(label, ac && i === 0 ? null : label, i === 0 && bold,
                 () => this._applySuggestion(label));
+        });
+    }
+
+    // Corrections favour slips onto neighbouring keys: tell the daemon where
+    // the letters are whenever the layout (or its shape) changes.
+    _sendKeyLayout() {
+        const layout = letterKeyCentres(this._kb);
+        if (!layout)
+            return;
+        const round = v => Math.round(v * 100) / 100;
+        const keys = Object.fromEntries(Object.entries(layout.keys).map(([k, [x, y]]) => [k, [round(x), round(y)]]));
+        const json = JSON.stringify(keys);
+        if (json === this._sentLayout)
+            return;
+        this._sentLayout = json;
+        this._daemon.setKeyLayout(keys).catch(() => {
+            this._sentLayout = '';
         });
     }
 

@@ -98,6 +98,11 @@
       <arg direction="in" type="s" name="language"/>
       <arg direction="out" type="s" name="replacement"/>
     </method>
+    <method name="SetKeyLayout">
+      <!-- The letter keys on screen, {"q": [x, y], ...} in units of one key width, as for
+           SwipeWords. Corrections then favour slips onto neighbouring keys. QWERTY until set. -->
+      <arg direction="in" type="s" name="keys"/>
+    </method>
     <method name="AcceptWord">
       <!-- The user undid a correction of this word: never correct it again. -->
       <arg direction="in" type="s" name="word"/>

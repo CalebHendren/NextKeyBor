@@ -45,6 +45,23 @@ function allLetterButtons(root, out = []) {
     return out;
 }
 
+// Centres of the letter keys on screen, {"q": [x, y], ...}, in key widths
+// so the daemon's radii mean "keys"; null when no letters are showing.
+export function letterKeyCentres(keyboard) {
+    const buttons = allLetterButtons(keyboard);
+    if (buttons.length === 0)
+        return null;
+    const widths = buttons.map(b => b.get_transformed_size()[0]).sort((a, b) => a - b);
+    const unit = widths[Math.floor(widths.length / 2)] || 1;
+    const keys = {};
+    for (const b of buttons) {
+        const [bx, by] = b.get_transformed_position();
+        const [bw, bh] = b.get_transformed_size();
+        keys[b.get_label().toLowerCase()] = [(bx + bw / 2) / unit, (by + bh / 2) / unit];
+    }
+    return {keys, unit};
+}
+
 class Trail {
     constructor() {
         this._points = []; // [x, y, time] in stage coordinates
@@ -242,22 +259,13 @@ export class SwipeTyper {
     }
 
     _finish() {
-        const buttons = allLetterButtons(this._kb);
+        const layout = letterKeyCentres(this._kb);
         const shifted = this._kb._currentPage === this._kb._layers?.['shift'];
         const points = this._points;
         this._reset();
-        if (buttons.length === 0)
+        if (!layout)
             return;
-
-        // Normalise to key-width units so the daemon's radii mean "keys".
-        const widths = buttons.map(b => b.get_transformed_size()[0]).sort((a, b) => a - b);
-        const unit = widths[Math.floor(widths.length / 2)] || 1;
-        const keys = {};
-        for (const b of buttons) {
-            const [bx, by] = b.get_transformed_position();
-            const [bw, bh] = b.get_transformed_size();
-            keys[b.get_label().toLowerCase()] = [(bx + bw / 2) / unit, (by + bh / 2) / unit];
-        }
+        const {keys, unit} = layout;
         const t0 = points[0][2];
         const path = points.map(([px, py, t]) => [px / unit, py / unit, t - t0]);
         this._onSwipe(keys, path, shifted);

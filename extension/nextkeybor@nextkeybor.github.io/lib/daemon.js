@@ -133,6 +133,10 @@ export class DaemonClient extends Signals.EventEmitter {
         return replacement;
     }
 
+    setKeyLayout(keys) {
+        return this._call('SetKeyLayout', JSON.stringify(keys));
+    }
+
     acceptWord(word) {
         return this._call('AcceptWord', word);
     }

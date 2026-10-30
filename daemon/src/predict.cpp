@@ -52,7 +52,9 @@ private:
     void maybe_fetch_frequencies();
     double score(const Entry &e) const;
     void add_candidates(const std::string &prefix_key, std::map<std::string, double> &out) const;
-    void for_each_edit(const std::string &key, const std::function<void(const std::string &, bool)> &fn) const;
+    void for_each_edit(const std::string &key, const std::function<void(const std::string &, double)> &fn) const;
+    std::unordered_map<size_t, double> corrections(const std::string &key) const;
+    void add_two_slips(const std::string &key, std::unordered_map<size_t, double> &out) const;
     void add_corrections(const std::string &key, std::map<std::string, double> &out) const;
     double likelihood(const Entry &e) const;
 
@@ -70,6 +72,90 @@ constexpr size_t kUnranked = 100000;  // the rank given to dictionary words miss
 
 std::map<std::string, std::unique_ptr<Model>> g_models;
 std::string g_active;
+
+// ---- key layout ----
+//
+// Where the letter keys are, in key widths with rows one unit apart, so
+// corrections know which slips are likely: "hapoy" is "happy" (o is next to
+// p), "hazpy" much less so. The extension sends the keyboard on screen
+// (SetKeyLayout); until then, QWERTY.
+
+double dist(Point a, Point b) {
+    return std::hypot(a.x - b.x, a.y - b.y);
+}
+
+double dist2(Point a, Point b) {
+    return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
+}
+
+// The keys with y divided by the distance between rows: rows are often
+// taller (portrait) or shorter than keys are wide, and people miss by a share
+// of a key. Returns that distance.
+double normalise_rows(const std::map<gunichar, Point> &in, std::map<gunichar, Point> &out) {
+    std::vector<double> ys;
+    for (const auto &[c, pt] : in)
+        ys.push_back(pt.y);
+    std::sort(ys.begin(), ys.end());
+    double row_step = 1.0;
+    if (!ys.empty()) {
+        std::vector<double> rows{ys.front()};
+        for (double y : ys)
+            if (y - rows.back() > 0.3)
+                rows.push_back(y);
+        if (rows.size() >= 2) {
+            std::vector<double> steps;
+            for (size_t i = 1; i < rows.size(); i++)
+                steps.push_back(rows[i] - rows[i - 1]);
+            std::sort(steps.begin(), steps.end());
+            row_step = std::clamp(steps[steps.size() / 2], 0.5, 3.0);
+        }
+    }
+    out.clear();
+    for (const auto &[c, pt] : in)
+        out[c] = {pt.x, pt.y / row_step};
+    return row_step;
+}
+
+std::map<gunichar, Point> g_layout;
+
+const std::map<gunichar, Point> &key_layout() {
+    static const std::map<gunichar, Point> qwerty = [] {
+        std::map<gunichar, Point> keys;
+        const char *rows[] = {"qwertyuiop", "asdfghjkl", "zxcvbnm"};
+        for (int r = 0; r < 3; r++)
+            for (int i = 0; rows[r][i]; i++)
+                keys[static_cast<gunichar>(rows[r][i])] = {i + 0.5 * r + (r == 2 ? 0.5 : 0.0), static_cast<double>(r)};
+        return keys;
+    }();
+    return g_layout.empty() ? qwerty : g_layout;
+}
+
+// Distance between two letters' keys, or -1 if either is not a letter key
+// (accented letters are on long-press, for one).
+double key_distance(gunichar a, gunichar b) {
+    const auto &keys = key_layout();
+    auto ka = keys.find(g_unichar_tolower(a)), kb = keys.find(g_unichar_tolower(b));
+    if (ka == keys.end() || kb == keys.end())
+        return -1;
+    return dist(ka->second, kb->second);
+}
+
+constexpr double kEditTransposed = 3.0;   // swapped letters ("teh") are the commonest slip
+constexpr double kEditNear = 2.0;         // a letter typed on the very key meant would weigh this
+constexpr double kEditFar = 0.15;         // and one typed far from it this
+constexpr double kEditReach = 1.2;        // how quickly that falls off, in keys
+constexpr double kEditExtraNear = 1.5;    // an extra letter from a key next to its neighbour
+constexpr double kEditExtraFar = 0.6;     // an extra letter from anywhere else
+constexpr double kEditSecond = 0.05;      // a second slip in the same word
+constexpr glong kEditTwoMinLength = 6;    // only words this long get a second slip
+
+// How likely typing `typed` instead of `meant` is.
+double substitution_weight(gunichar typed, gunichar meant) {
+    double d = key_distance(typed, meant);
+    if (d < 0)
+        return 1.0;
+    return kEditFar + (kEditNear - kEditFar) * std::exp(-d * d / (2 * kEditReach * kEditReach));
+}
 
 std::string dic_path(const std::string &lang) {
     for (const char *dir : {"/usr/share/hunspell", "/usr/share/myspell", "/usr/local/share/hunspell"}) {
@@ -267,64 +353,147 @@ void Model::add_candidates(const std::string &prefix_key, std::map<std::string, 
     }
 }
 
-// Calls fn(edit, transposed) for every string at edit distance 1 from key
-// (delete, transpose, replace, insert), over the language's alphabet.
-void Model::for_each_edit(const std::string &key, const std::function<void(const std::string &, bool)> &fn) const {
+// Calls fn(edit, weight) for every string at edit distance 1 from key
+// (delete, transpose, replace, insert), over the language's alphabet; weight
+// says how likely that slip is on the keyboard in use. An edit may come more
+// than once.
+void Model::for_each_edit(const std::string &key, const std::function<void(const std::string &, double)> &fn) const {
     std::vector<std::string> chars;
-    for (const gchar *p = key.c_str(); *p; p = g_utf8_next_char(p))
+    std::vector<gunichar> cps;
+    for (const gchar *p = key.c_str(); *p; p = g_utf8_next_char(p)) {
         chars.emplace_back(p, static_cast<size_t>(g_utf8_next_char(p) - p));
-    std::vector<std::string> alpha;
+        cps.push_back(g_utf8_get_char(p));
+    }
+    std::vector<std::pair<gunichar, std::string>> alpha;
     for (gunichar c : alphabet_) {
         char buf[8];
-        alpha.emplace_back(buf, static_cast<size_t>(g_unichar_to_utf8(c, buf)));
+        alpha.emplace_back(c, std::string(buf, static_cast<size_t>(g_unichar_to_utf8(c, buf))));
     }
-    auto join = [](const std::vector<std::string> &v) {
+    const size_t n = chars.size();
+    // The key with chars [from, to) replaced by mid.
+    auto splice = [&](size_t from, size_t to, const std::string &mid) {
         std::string s;
-        for (const auto &c : v)
-            s += c;
+        for (size_t i = 0; i < from; i++)
+            s += chars[i];
+        s += mid;
+        for (size_t i = to; i < n; i++)
+            s += chars[i];
         return s;
     };
-    std::map<std::string, bool> edits;  // edit -> reached by a transposition
-    for (size_t i = 0; i < chars.size(); i++) {
-        auto v = chars;
-        if (chars.size() >= 4) {
-            v.erase(v.begin() + static_cast<long>(i));
-            edits.emplace(join(v), false);
+    for (size_t i = 0; i < n; i++) {
+        // An extra letter: likelier from a key next to the letter before or
+        // after it (or the same key twice).
+        if (n >= 4) {
+            double w = kEditExtraFar;
+            for (size_t j : {i - 1, i + 1}) {
+                if (j >= n)
+                    continue;
+                double d = cps[j] == cps[i] ? 0.0 : key_distance(cps[i], cps[j]);
+                if (d >= 0 && d <= kEditReach)
+                    w = kEditExtraNear;
+            }
+            fn(splice(i, i + 1, ""), w);
         }
-        if (i + 1 < chars.size()) {
-            v = chars;
-            std::swap(v[i], v[i + 1]);
-            edits[join(v)] = true;
-        }
-        for (const auto &a : alpha) {
-            v = chars;
-            v[i] = a;
-            edits.emplace(join(v), false);
-        }
+        if (i + 1 < n && cps[i] != cps[i + 1])
+            fn(splice(i, i + 2, chars[i + 1] + chars[i]), kEditTransposed);
+        for (const auto &[c, a] : alpha)
+            if (c != cps[i])
+                fn(splice(i, i + 1, a), substitution_weight(cps[i], c));
     }
-    for (size_t i = 0; i <= chars.size(); i++)
-        for (const auto &a : alpha) {
-            auto v = chars;
-            v.insert(v.begin() + static_cast<long>(i), a);
-            edits.emplace(join(v), false);
-        }
-    edits.erase(key);
-    for (const auto &[e, transposed] : edits)
-        fn(e, transposed);
+    // A missing letter.
+    for (size_t i = 0; i <= n; i++)
+        for (const auto &[c, a] : alpha)
+            fn(splice(i, i, a), 1.0);
 }
 
-void Model::add_corrections(const std::string &key, std::map<std::string, double> &out) const {
-    // Known words at edit distance 1.
-    for_each_edit(key, [&](const std::string &e, bool) {
+// Known words one slip from key, or for long words two slips when none is
+// one away: entry index -> how likely the slip (see for_each_edit).
+std::unordered_map<size_t, double> Model::corrections(const std::string &key) const {
+    std::unordered_map<size_t, double> out;
+    std::unordered_map<std::string, double> edits;
+    for_each_edit(key, [&](const std::string &e, double w) {
+        double &best = edits[e];
+        best = std::max(best, w);
+    });
+    edits.erase(key);
+    auto note = [&](const std::string &e, double w) {
         auto it = exact_.find(e);
         if (it == exact_.end() || blocked_.count(e))
             return;
-        const Entry &en = entries_[it->second];
-        double s = score(en) * 0.3;
+        double &best = out[it->second];
+        best = std::max(best, w);
+    };
+    for (const auto &[e, w] : edits)
+        note(e, w);
+    if (out.empty() && g_utf8_strlen(key.c_str(), -1) >= kEditTwoMinLength)
+        add_two_slips(key, out);
+    return out;
+}
+
+// Known words exactly two slips from key (optimal string alignment
+// distance), each with weight kEditSecond. Generating every edit of every
+// edit is too slow to do per key press, so this walks the sorted word list
+// instead, sharing the distance rows between words with a common prefix and
+// skipping every word under a prefix that is already too far off.
+void Model::add_two_slips(const std::string &key, std::unordered_map<size_t, double> &out) const {
+    std::vector<gunichar> a;
+    for (const gchar *p = key.c_str(); *p; p = g_utf8_next_char(p))
+        a.push_back(g_utf8_get_char(p));
+    const size_t n = a.size();
+    std::vector<std::vector<int>> rows(1, std::vector<int>(n + 1));
+    for (size_t j = 0; j <= n; j++)
+        rows[0][j] = static_cast<int>(j);
+    std::vector<gunichar> done, w;  // done: the prefix rows[1..] are for
+    std::string skip;              // no word starting with this is close enough
+    for (size_t i = 0; i < entries_.size(); i++) {
+        const std::string &k = entries_[i].key;
+        if (!skip.empty() && k.compare(0, skip.size(), skip) == 0)
+            continue;
+        skip.clear();
+        w.clear();
+        for (const gchar *p = k.c_str(); *p; p = g_utf8_next_char(p))
+            w.push_back(g_utf8_get_char(p));
+        if (w.size() + 2 < n || w.size() > n + 2)
+            continue;
+        size_t common = 0;
+        while (common < done.size() && common < w.size() && done[common] == w[common])
+            common++;
+        done.resize(common);
+        bool far = false;
+        for (size_t d = common + 1; d <= w.size(); d++) {
+            if (rows.size() <= d)
+                rows.emplace_back(n + 1);
+            auto &row = rows[d];
+            const auto &up = rows[d - 1];
+            row[0] = static_cast<int>(d);
+            int best = row[0];
+            for (size_t j = 1; j <= n; j++) {
+                int v = std::min({up[j] + 1, row[j - 1] + 1, up[j - 1] + (w[d - 1] == a[j - 1] ? 0 : 1)});
+                if (d > 1 && j > 1 && w[d - 1] == a[j - 2] && w[d - 2] == a[j - 1])
+                    v = std::min(v, rows[d - 2][j - 2] + 1);
+                row[j] = v;
+                best = std::min(best, v);
+            }
+            done.push_back(w[d - 1]);
+            if (best > 2) {
+                skip = k.substr(0, static_cast<size_t>(g_utf8_offset_to_pointer(k.c_str(), static_cast<glong>(d)) - k.c_str()));
+                far = true;
+                break;
+            }
+        }
+        if (!far && rows[w.size()][n] == 2 && !blocked_.count(k))
+            out.emplace(i, kEditSecond);
+    }
+}
+
+void Model::add_corrections(const std::string &key, std::map<std::string, double> &out) const {
+    for (const auto &[i, w] : corrections(key)) {
+        const Entry &en = entries_[i];
+        double s = score(en) * 0.3 * w;
         auto [pos, inserted] = out.emplace(en.word, s);
         if (!inserted)
             pos->second = std::max(pos->second, s);
-    });
+    }
 }
 
 std::string match_case(const std::string &typed, const std::string &word) {
@@ -443,14 +612,6 @@ constexpr double kSwipeFreqWeight = 0.8;    // log word frequency against the pa
 constexpr double kSwipeNamePenalty = 2.0;   // capitalised words and acronyms the user never typed
 constexpr double kSwipeEndScale = 3.0;      // path before the first letter or after the last costs more
 constexpr double kSwipeTurnBonus = 1.0;     // letters tend to sit where the path turns or slows
-
-double dist(Point a, Point b) {
-    return std::hypot(a.x - b.x, a.y - b.y);
-}
-
-double dist2(Point a, Point b) {
-    return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
-}
 
 // Squared distance from p to the segment ab.
 double seg_dist2(Point p, Point a, Point b) {
@@ -619,27 +780,9 @@ std::vector<std::string> Model::swipe(const std::string &context, const std::map
     if (raw.size() < 2 || key_map.empty())
         return {};
 
-    // Measure distances in keys both ways: rows are often taller (portrait)
-    // or shorter than keys are wide, and people miss by a share of a key.
-    std::vector<double> ys;
-    for (const auto &[c, pt] : key_map)
-        ys.push_back(pt.y);
-    std::sort(ys.begin(), ys.end());
-    std::vector<double> rows{ys.front()};
-    for (double y : ys)
-        if (y - rows.back() > 0.3)
-            rows.push_back(y);
-    double row_step = 1.0;
-    if (rows.size() >= 2) {
-        std::vector<double> steps;
-        for (size_t i = 1; i < rows.size(); i++)
-            steps.push_back(rows[i] - rows[i - 1]);
-        std::sort(steps.begin(), steps.end());
-        row_step = std::clamp(steps[steps.size() / 2], 0.5, 3.0);
-    }
+    // Measure distances in keys both ways.
     std::map<gunichar, Point> keys;
-    for (const auto &[c, pt] : key_map)
-        keys[c] = {pt.x, pt.y / row_step};
+    const double row_step = normalise_rows(key_map, keys);
     std::vector<Point> scaled;
     for (const auto &pt : raw)
         if (scaled.empty() || dist(scaled.back(), {pt.x, pt.y / row_step}) > 1e-6 || &pt == &raw.back())
@@ -813,7 +956,6 @@ std::vector<std::string> Model::swipe(const std::string &context, const std::map
 
 constexpr double kAutocorrectMinLikelihood = 1.0 / 30000;  // corrections must be fairly common words
 constexpr double kAutocorrectMargin = 2.0;     // and this many times likelier than the next best
-constexpr double kAutocorrectTransposed = 3.0; // swapped letters ("teh") are the commonest slip
 constexpr double kAutocorrectMisspelt = 20.0;  // how much likelier a fix must be than a listed misspelling
 
 // The user's text shortcuts (setting text-shortcuts): "omw" -> "On my way!".
@@ -899,18 +1041,15 @@ std::string Model::autocorrect(const std::string &context, bool fix_typos) {
     const json *bigrams = !prev.empty() && bi != user_["bigrams"].end() ? &*bi : nullptr;
     std::string best;
     double first = 0, second = 0;
-    for_each_edit(key, [&](const std::string &edit, bool transposed) {
-        auto it = exact_.find(edit);
-        if (it == exact_.end() || blocked_.count(edit))
-            return;
-        const Entry &e = entries_[it->second];
+    for (const auto &[i, w] : corrections(key)) {
+        const Entry &e = entries_[i];
         if (typed_p > 0 && !e.stem)
-            return;
-        double p = likelihood(e) * (transposed ? kAutocorrectTransposed : 1.0);
+            continue;
+        double p = likelihood(e) * w;
         if (bigrams) {
             auto b = bigrams->find(e.word);
             if (b != bigrams->end())
-                p += b->get<double>() / 20.0;
+                p += w * b->get<double>() / 20.0;
         }
         if (p > first) {
             second = first;
@@ -919,7 +1058,7 @@ std::string Model::autocorrect(const std::string &context, bool fix_typos) {
         } else if (p > second) {
             second = p;
         }
-    });
+    }
     if (best.empty() || first < kAutocorrectMinLikelihood || first < kAutocorrectMargin * second || first < typed_p)
         return "";
     return match_case(typed, best);
@@ -1056,10 +1195,15 @@ void parse_swipe(const json &keys_in, const json &path_in, std::map<gunichar, Po
 
 int print_suggestions(const std::string &context, const std::string &lang) {
     Model &model = model_for(lang);
-    for (const auto &w : model.suggest(context, 3))
-        g_print("suggest  %s\n", w.c_str());
+    gint64 t0 = g_get_monotonic_time();
+    auto words = model.suggest(context, 3);
+    gint64 t1 = g_get_monotonic_time();
     std::string fix = model.autocorrect(context, true);
+    gint64 t2 = g_get_monotonic_time();
+    for (const auto &w : words)
+        g_print("suggest  %s\n", w.c_str());
     g_print("correct  %s\n", fix.empty() ? "(leave as typed)" : fix.c_str());
+    g_print("took     %.1f ms + %.1f ms\n", static_cast<double>(t1 - t0) / 1000.0, static_cast<double>(t2 - t1) / 1000.0);
     return 0;
 }
 
@@ -1182,6 +1326,24 @@ void init() {
         const gchar *context, *lang;
         g_variant_get(params, "(&s&s)", &context, &lang);
         reply_string(inv, model_for(lang).autocorrect(context, setting_bool("autocorrect", true)));
+    });
+    svc.on("SetKeyLayout", [](GVariant *params, GDBusMethodInvocation *inv) {
+        const gchar *keys_json;
+        g_variant_get(params, "(&s)", &keys_json);
+        std::map<gunichar, Point> keys;
+        try {
+            json parsed = json::parse(keys_json);
+            for (auto &[k, v] : parsed.items())
+                keys[g_unichar_tolower(g_utf8_get_char(k.c_str()))] = {v.at(0).get<double>(), v.at(1).get<double>()};
+        } catch (const std::exception &e) {
+            g_dbus_method_invocation_return_error(inv, G_DBUS_ERROR, G_DBUS_ERROR_INVALID_ARGS,
+                                                  "bad key layout: %s", e.what());
+            return;
+        }
+        // Fewer keys than a letter row: a symbols page, not worth keeping.
+        if (keys.size() >= 10)
+            normalise_rows(keys, g_layout);
+        reply_empty(inv);
     });
     svc.on("AcceptWord", [](GVariant *params, GDBusMethodInvocation *inv) {
         const gchar *word;
