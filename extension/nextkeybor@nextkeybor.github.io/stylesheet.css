@@ -177,6 +177,9 @@
 .nkb-row-icon { icon-size: 16px; }
 .nkb-row-progress { font-size: 0.85em; color: rgba(255, 255, 255, 0.75); }
 
+/* Clipboard history (lib/clipboard.js) */
+.nkb-clip-row { min-height: 44px; }
+
 /* Floating keyboard (lib/floating.js) */
 .nkb-floating #keyboard {
   border-radius: 18px;

@@ -75,7 +75,7 @@ function flowBox(styleClass) {
     });
 }
 
-const Panel = GObject.registerClass({
+export const Panel = GObject.registerClass({
     Signals: {
         'close-request': {},
         'expanded-changed': {param_types: [GObject.TYPE_BOOLEAN]},

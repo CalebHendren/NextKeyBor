@@ -4,6 +4,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Keyboard} from 'resource:///org/gnome/shell/ui/keyboard.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import {ClipboardHistory} from './lib/clipboard.js';
 import {DaemonClient} from './lib/daemon.js';
 import {Floating, KeyboardIndicator} from './lib/floating.js';
 import {TapFix, updateLevelFromHints} from './lib/fixes.js';
@@ -18,6 +19,7 @@ export default class NextKeyBorExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._daemon = new DaemonClient(this.dir);
+        this._clipboard = new ClipboardHistory(this._settings);
         this._uis = new Map(); // Keyboard -> KeyboardUi
         this._tapFix = null;
 
@@ -73,6 +75,8 @@ export default class NextKeyBorExtension extends Extension {
 
         this._daemon.destroy();
         this._daemon = null;
+        this._clipboard.destroy();
+        this._clipboard = null;
         this._settings = null;
         this._uis = null;
     }
@@ -235,6 +239,7 @@ export default class NextKeyBorExtension extends Extension {
             const ui = new KeyboardUi(kb, {
                 settings: this._settings,
                 daemon: this._daemon,
+                clipboard: this._clipboard,
                 floating: this._floating,
                 openPreferences: () => {
                     kb.close(true);

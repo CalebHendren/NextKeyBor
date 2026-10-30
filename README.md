@@ -19,6 +19,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
   - the ?123 page stays up while you type digits and symbols, and a space takes you back to the letters
 - **Resizable:** drag the handle on top of the keyboard to set its height, separately for landscape and portrait.
 - **Floating keyboard:** switch it on from the keyboard button in the top bar (hold it for the menu) or in settings. The keyboard becomes a panel you drag by its top bar; it opens where you left it, whether you tap a text field or the top bar button, and its X closes it.
+- **Clipboard history:** the clipboard button lists the last 20 texts you copied; tap one to paste it, hold to pin it. Kept in memory only, never on disk, and passwords copied from password managers are skipped.
 - **Screenshots:** the camera button opens GNOME's screenshot tool (area, window or screen; picture or video).
 - **Hold for special characters:** long-press top-row letters for the digits 1–0. Other keys give common symbols, alongside GNOME's accented letters.
 - **Number row:** an optional row of digits above the letters (in settings); hold a digit for fractions and superscripts.
@@ -78,6 +79,7 @@ Everything stays on your machine unless you search for GIFs or stickers, which s
 
 - Learned words, favourites, your own GIF library and the swipe log (only when turned on): `~/.local/share/nextkeybor/`
 - Cache: `~/.cache/nextkeybor/`
+- Clipboard history: in memory only, never written to disk; gone when you log out or turn it off.
 
 ## Licence
 

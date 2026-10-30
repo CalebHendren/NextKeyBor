@@ -10,6 +10,7 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {ClipboardPanel} from './clipboard.js';
 import {waitForSignal} from './daemon.js';
 import {EmojiPanel, LanguagePanel, MediaPanel} from './panels.js';
 import {KeyGestures} from './gestures.js';
@@ -70,10 +71,11 @@ function loadBytes(path) {
 }
 
 export class KeyboardUi {
-    constructor(keyboard, {settings, daemon, openPreferences, floating = null}) {
+    constructor(keyboard, {settings, daemon, clipboard, openPreferences, floating = null}) {
         this._kb = keyboard;
         this._settings = settings;
         this._daemon = daemon;
+        this._clipboard = clipboard;
         this._openPreferences = openPreferences;
         this._floating = floating;
 
@@ -166,7 +168,8 @@ export class KeyboardUi {
         settings.connectObject('changed', (_s, key) => {
             if (key === 'speech-language')
                 this._syncMicLabel();
-            if (key === 'gif-provider' || key.endsWith('-api-key') || key === 'floating')
+            if (key === 'gif-provider' || key.endsWith('-api-key') || key === 'floating' ||
+                key === 'clipboard-history')
                 this._syncVisibility();
             if (key === 'suggestions-enabled') {
                 this._syncVisibility();
@@ -368,6 +371,10 @@ export class KeyboardUi {
         this._toolbar.add_child(this._center);
 
         // Emoji live on the keyboard's own emoji key (see extension.js).
+        this._clipboardButton = iconButton('edit-paste-symbolic', {
+            accessibleName: 'Clipboard history',
+            onTap: () => this.togglePanel('clipboard'),
+        });
         this._screenshotButton = iconButton('camera-photo-symbolic', {
             accessibleName: 'Take a screenshot or screen recording',
             onTap: () => this._openScreenshotUi(),
@@ -389,7 +396,7 @@ export class KeyboardUi {
             accessibleName: 'Close keyboard',
             onTap: () => this._kb.close(true),
         });
-        for (const b of [this._screenshotButton, this._gifButton, this._stickerButton, this._settingsButton, this._closeButton])
+        for (const b of [this._clipboardButton, this._screenshotButton, this._gifButton, this._stickerButton, this._settingsButton, this._closeButton])
             this._toolbar.add_child(b);
 
         kb.insert_child_at_index(this._toolbar, 0);
@@ -416,6 +423,7 @@ export class KeyboardUi {
         }
         this._micButton.visible = !password;
         this._closeButton.visible = !!this._floating?.enabled;
+        this._clipboardButton.visible = this._settings.get_boolean('clipboard-history');
         // Openverse (used until a GIPHY/KLIPY key is set) has no stickers.
         const provider = this._settings.get_string('gif-provider');
         this._stickerButton.visible = provider !== 'openverse' &&
@@ -475,6 +483,8 @@ export class KeyboardUi {
             });
         } else if (name === 'language') {
             panel = new LanguagePanel(this._daemon, this._settings);
+        } else if (name === 'clipboard') {
+            panel = new ClipboardPanel(this._clipboard, {paste: text => this._commitToApp(text)});
         } else {
             return;
         }
@@ -490,6 +500,7 @@ export class KeyboardUi {
         setChecked(this._gifButton, name === 'gif');
         setChecked(this._stickerButton, name === 'sticker');
         setChecked(this._langButton, name === 'language');
+        setChecked(this._clipboardButton, name === 'clipboard');
         this._syncVisibility();
         this._syncStockSuggestions?.();
         this._layoutPanel();
@@ -506,7 +517,7 @@ export class KeyboardUi {
         panel.destroy();
         this._panelHost.hide();
         this._syncStockSuggestions?.();
-        for (const b of [this._gifButton, this._stickerButton, this._langButton])
+        for (const b of [this._gifButton, this._stickerButton, this._langButton, this._clipboardButton])
             setChecked(b, false);
         this._kb._aspectContainer?.show();
         this._setExtraHeight(0);
