@@ -63,6 +63,12 @@ export class KeyGestures {
         this._space = null;
     }
 
+    // Drop the touch being watched, if any (its key is going away).
+    reset() {
+        this.hidePopup();
+        this._space = null;
+    }
+
     _onEvent(event) {
         const T = Clutter.EventType;
         const type = event.type();

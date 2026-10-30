@@ -54,6 +54,26 @@ export function updateLevelFromHints(userInputHappened) {
         this._setActiveLevel('default');
 }
 
+// Closes the long-press popups (extra characters) of the keyboard's keys,
+// and the language menu. A key with its popup open holds a stage-wide
+// captured-event handler that stops every press outside the popup; when
+// the keys are rebuilt under it, touches could stop reaching anything.
+export function closeKeyPopups(keyboard) {
+    const visit = actor => {
+        for (const child of actor.get_children()) {
+            if (child._boxPointer && typeof child._hideSubkeys === 'function') {
+                child.cancel();
+                child._hideSubkeys();
+            } else {
+                visit(child);
+            }
+        }
+    };
+    if (keyboard._currentLayout)
+        visit(keyboard._currentLayout);
+    keyboard._languagePopup?.close(false);
+}
+
 // The app sends text_input_v3.enable only after it has processed the tap, so
 // look for the focused text input a little later, then again for slow apps
 // and for Chromium, which drops and re-enables it while the tap settles.

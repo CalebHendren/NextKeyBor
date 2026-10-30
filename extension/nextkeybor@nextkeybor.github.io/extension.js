@@ -7,7 +7,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {ClipboardHistory} from './lib/clipboard.js';
 import {DaemonClient} from './lib/daemon.js';
 import {Floating, KeyboardIndicator} from './lib/floating.js';
-import {TapFix, updateLevelFromHints} from './lib/fixes.js';
+import {TapFix, closeKeyPopups, updateLevelFromHints} from './lib/fixes.js';
 import {augmentRow, centreSpaceBar, numberRowFor, replaceWwwKey} from './lib/holds.js';
 import {KeyboardUi, MAX_HEIGHT_RATIO} from './lib/keyboardUi.js';
 
@@ -120,6 +120,7 @@ export default class NextKeyBorExtension extends Extension {
             _setupKeyboard: proto._setupKeyboard,
             _relayout: proto._relayout,
             _addRowKeys: proto._addRowKeys,
+            _updateKeys: proto._updateKeys,
             _updateLevelFromHints: proto._updateLevelFromHints,
             _toggleEmoji: proto._toggleEmoji,
             setCursorLocation: proto.setCursorLocation,
@@ -170,6 +171,18 @@ export default class NextKeyBorExtension extends Extension {
                 ui.togglePanel('emoji');
             else
                 orig._toggleEmoji.apply(this, args);
+        };
+
+        // Rebuilding the keys (settings, layout or text field changes) must
+        // not leave a popup or a half-finished gesture on keys that are gone.
+        proto._updateKeys = function (...args) {
+            try {
+                ext._uis?.get(this)?.resetGestures();
+                closeKeyPopups(this);
+            } catch (e) {
+                console.error(`NextKeyBor: closing key popups failed: ${e}`);
+            }
+            return orig._updateKeys.apply(this, args);
         };
 
         proto._addRowKeys = function (keys, layout, ...rest) {

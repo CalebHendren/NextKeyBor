@@ -230,6 +230,12 @@ export class KeyboardUi {
         this._kb = null;
     }
 
+    // Forget touches in progress, before the keys they started on go away.
+    resetGestures() {
+        this._swipe.reset();
+        this._gestures.reset();
+    }
+
     // GNOME's own screenshot UI (area, window or screen; picture or video).
     // Close the keyboard first so it is not in the shot.
     _openScreenshotUi() {

@@ -145,6 +145,11 @@ export class SwipeTyper {
         this._reset();
     }
 
+    // Drop the touch being watched, if any (its key is going away).
+    reset() {
+        this._reset();
+    }
+
     _reset() {
         this._slot = null;
         this._key = null;
