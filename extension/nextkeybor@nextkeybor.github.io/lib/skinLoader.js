@@ -57,14 +57,25 @@ export class SkinLoader {
             console.error(`NextKeyBor: could not load skin ${id}: ${e.message}`);
             return; // keep the skin that is showing
         }
-        this._unload();
-        if (!file)
+        if (!file) {
+            this._unload();
             return;
+        }
+        // Parse it in a theme of its own first: a CSS error then keeps the
+        // skin that is showing.
+        try {
+            new St.Theme().load_stylesheet(file);
+        } catch (e) {
+            console.error(`NextKeyBor: skin ${id} has a CSS error: ${e.message}`);
+            this._deleteGenerated(file);
+            return;
+        }
+        this._unload();
         try {
             this._theme().load_stylesheet(file);
             this._loaded = file;
         } catch (e) {
-            console.error(`NextKeyBor: skin ${id} has a CSS error: ${e.message}`);
+            console.error(`NextKeyBor: could not load skin ${id}: ${e.message}`);
             this._deleteGenerated(file);
         }
     }
@@ -91,7 +102,8 @@ export class SkinLoader {
         this._unwatch();
         if (!file)
             return;
-        GLib.mkdir_with_parents(file.get_parent().get_path(), 0o755);
+        // A folder that doesn't exist yet (~/.cache/wal before pywal's first
+        // run) is still watched, and seen once it appears.
         try {
             this._monitor = file.get_parent().monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, null);
         } catch (e) {
