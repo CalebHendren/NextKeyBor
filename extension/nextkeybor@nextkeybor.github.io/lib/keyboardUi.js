@@ -37,7 +37,6 @@ const DOUBLE_SPACE_MS = 1000;
 const BOUNCE_MARGIN_MS = 30;
 const SPLIT_CHECK_MS = 250;
 const MAX_DELETE_WORDS = 30;
-const DELETE_TAP_MS = 300;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
 // The word just finished with a space, for emoji suggestions.
@@ -121,7 +120,7 @@ export class KeyboardUi {
         this._capDeleteDown = false;
         this._swallowRelease = false;
         this._deletePressTime = 0;
-        this._ignoreDeleteUntil = 0;
+        this._ignoreDeleteId = 0; // while set, the end of a backspace swipe
         this._deleteEnds = null; // see _startWordDelete
         this._dictation = {id: null, state: 'idle'};
         this.extraHeight = 0;
@@ -245,6 +244,8 @@ export class KeyboardUi {
         this._flashId = 0;
         if (this._keyQueueId)
             GLib.source_remove(this._keyQueueId);
+        if (this._ignoreDeleteId)
+            GLib.source_remove(this._ignoreDeleteId);
         this._keyQueueId = 0;
         if (this._splitCheckId)
             GLib.source_remove(this._splitCheckId);
@@ -320,7 +321,14 @@ export class KeyboardUi {
     }
 
     _finishWordDelete(n) {
-        this._ignoreDeleteUntil = GLib.get_monotonic_time() + DELETE_TAP_MS * 1000;
+        // The backspace key handles the same touch end right after this and
+        // reports a tap: ignore delete toggles until the event is done.
+        if (!this._ignoreDeleteId) {
+            this._ignoreDeleteId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                this._ignoreDeleteId = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+        }
         this._syncMic();
         const ends = this._deleteEnds;
         this._deleteEnds = null;
@@ -787,7 +795,7 @@ export class KeyboardUi {
 
         ctrl.toggleDelete = enabled => {
             // The backspace key's own tap at the end of a backspace swipe.
-            if (GLib.get_monotonic_time() < this._ignoreDeleteUntil)
+            if (this._ignoreDeleteId)
                 return;
             if (this._panel?.capturesTyping) {
                 if (enabled && !this._capDeleteDown)
