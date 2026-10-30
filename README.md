@@ -19,6 +19,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
   - the ?123 page stays up while you type digits and symbols, and a space takes you back to the letters
 - **Resizable:** drag the handle on top of the keyboard to set its height, separately for landscape and portrait.
 - **Floating keyboard:** switch it on from the keyboard button in the top bar (hold it for the menu) or in settings. The keyboard becomes a panel you drag by its top bar; it opens where you left it, whether you tap a text field or the top bar button, and its X closes it.
+- **Text editing:** the editing button swaps the keys for a panel with arrows (with Select on, they extend the selection), Home/End, select all, cut, copy, paste, undo, redo and delete. Arrows and delete repeat while held.
 - **Clipboard history:** the clipboard button lists the last 20 texts you copied; tap one to paste it, hold to pin it. Kept in memory only, never on disk, and passwords copied from password managers are skipped.
 - **Screenshots:** the camera button opens GNOME's screenshot tool (area, window or screen; picture or video).
 - **Hold for special characters:** long-press top-row letters for the digits 1–0. Other keys give common symbols, alongside GNOME's accented letters.

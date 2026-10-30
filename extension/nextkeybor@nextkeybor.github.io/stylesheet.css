@@ -180,6 +180,20 @@
 /* Clipboard history (lib/clipboard.js) */
 .nkb-clip-row { min-height: 44px; }
 
+/* Text editing (lib/editPanel.js) */
+.nkb-edit-title { font-weight: bold; color: #ffffff; }
+.nkb-edit-grid { padding: 4px; }
+.nkb-edit-key {
+  border-radius: 12px;
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.nkb-edit-key:active { background-color: rgba(255, 255, 255, 0.25); }
+.nkb-edit-key:checked { background-color: st-mix(-st-accent-color, #2e2e33, 60%); }
+.nkb-edit-key StIcon { icon-size: 22px; }
+.nkb-edit-key-box { spacing: 2px; }
+.nkb-edit-key-label { font-size: 0.85em; }
+
 /* Floating keyboard (lib/floating.js) */
 .nkb-floating #keyboard {
   border-radius: 18px;

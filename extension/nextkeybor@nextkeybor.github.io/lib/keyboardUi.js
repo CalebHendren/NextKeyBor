@@ -12,6 +12,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {ClipboardPanel} from './clipboard.js';
 import {waitForSignal} from './daemon.js';
+import {EditPanel} from './editPanel.js';
 import {EmojiPanel, LanguagePanel, MediaPanel} from './panels.js';
 import {KeyGestures} from './gestures.js';
 import {SwipeTyper, letterKeyCentres} from './swipe.js';
@@ -371,6 +372,10 @@ export class KeyboardUi {
         this._toolbar.add_child(this._center);
 
         // Emoji live on the keyboard's own emoji key (see extension.js).
+        this._editButton = iconButton('edit-select-all-symbolic', {
+            accessibleName: 'Text editing',
+            onTap: () => this.togglePanel('edit'),
+        });
         this._clipboardButton = iconButton('edit-paste-symbolic', {
             accessibleName: 'Clipboard history',
             onTap: () => this.togglePanel('clipboard'),
@@ -396,7 +401,7 @@ export class KeyboardUi {
             accessibleName: 'Close keyboard',
             onTap: () => this._kb.close(true),
         });
-        for (const b of [this._clipboardButton, this._screenshotButton, this._gifButton, this._stickerButton, this._settingsButton, this._closeButton])
+        for (const b of [this._editButton, this._clipboardButton, this._screenshotButton, this._gifButton, this._stickerButton, this._settingsButton, this._closeButton])
             this._toolbar.add_child(b);
 
         kb.insert_child_at_index(this._toolbar, 0);
@@ -485,6 +490,8 @@ export class KeyboardUi {
             panel = new LanguagePanel(this._daemon, this._settings);
         } else if (name === 'clipboard') {
             panel = new ClipboardPanel(this._clipboard, {paste: text => this._commitToApp(text)});
+        } else if (name === 'edit') {
+            panel = new EditPanel({edit: (action, select) => this._editText(action, select)});
         } else {
             return;
         }
@@ -501,6 +508,7 @@ export class KeyboardUi {
         setChecked(this._stickerButton, name === 'sticker');
         setChecked(this._langButton, name === 'language');
         setChecked(this._clipboardButton, name === 'clipboard');
+        setChecked(this._editButton, name === 'edit');
         this._syncVisibility();
         this._syncStockSuggestions?.();
         this._layoutPanel();
@@ -517,7 +525,7 @@ export class KeyboardUi {
         panel.destroy();
         this._panelHost.hide();
         this._syncStockSuggestions?.();
-        for (const b of [this._gifButton, this._stickerButton, this._langButton, this._clipboardButton])
+        for (const b of [this._gifButton, this._stickerButton, this._langButton, this._clipboardButton, this._editButton])
             setChecked(b, false);
         this._kb._aspectContainer?.show();
         this._setExtraHeight(0);
@@ -718,9 +726,10 @@ export class KeyboardUi {
     }
 
     // Press and release keys one at a time from a queue, so a replacement
-    // word typed after Backspaces stays in order. With GNOME's Bounce Keys on
-    // (Accessibility > Typing), a key repeated within its delay is ignored,
-    // so repeats wait that long.
+    // word typed after Backspaces stays in order. An entry is a keyval or
+    // {keyval, modifiers} for a shortcut such as Ctrl+C. With GNOME's Bounce
+    // Keys on (Accessibility > Typing), a key repeated within its delay is
+    // ignored, so repeats wait that long.
     _pressKeys(keyvals) {
         this._keyQueue.push(...keyvals);
         if (!this._keyQueueId)
@@ -728,19 +737,25 @@ export class KeyboardUi {
     }
 
     _drainKeys(previous = null) {
-        const keyval = this._keyQueue.shift();
-        if (keyval === undefined || !this._ctrl) {
+        const entry = this._keyQueue.shift();
+        if (entry === undefined || !this._ctrl) {
             this._keyQueueId = 0;
             return;
         }
+        const {keyval, modifiers = []} = typeof entry === 'number' ? {keyval: entry} : entry;
         const wait = keyval === previous && this._a11yKeyboard.get_boolean('bouncekeys-enable')
             ? this._a11yKeyboard.get_int('bouncekeys-delay') + BOUNCE_MARGIN_MS : 0;
         const press = () => {
             // Real timestamps: the stock keyvalPress uses the current event's
             // time, which is 0 outside an input handler.
             const device = this._ctrl._virtualDevice;
-            device.notify_keyval(GLib.get_monotonic_time(), keyval, Clutter.KeyState.PRESSED);
-            device.notify_keyval(GLib.get_monotonic_time(), keyval, Clutter.KeyState.RELEASED);
+            const send = (k, state) => device.notify_keyval(GLib.get_monotonic_time(), k, state);
+            for (const m of modifiers)
+                send(m, Clutter.KeyState.PRESSED);
+            send(keyval, Clutter.KeyState.PRESSED);
+            send(keyval, Clutter.KeyState.RELEASED);
+            for (const m of [...modifiers].reverse())
+                send(m, Clutter.KeyState.RELEASED);
             this._keyQueueId = GLib.timeout_add(GLib.PRIORITY_HIGH, KEY_GAP_MS, () => {
                 this._drainKeys(keyval);
                 return GLib.SOURCE_REMOVE;
@@ -754,6 +769,34 @@ export class KeyboardUi {
         } else {
             press();
         }
+    }
+
+    // An action from the text-editing panel (lib/editPanel.js), as keys.
+    _editText(action, select) {
+        const K = Clutter;
+        const ctrl = K.KEY_Control_L, shift = K.KEY_Shift_L;
+        // Terminals copy and paste with Ctrl+Shift.
+        const clip = this._isTerminal() ? [ctrl, shift] : [ctrl];
+        const moves = {left: K.KEY_Left, right: K.KEY_Right, up: K.KEY_Up, down: K.KEY_Down, home: K.KEY_Home, end: K.KEY_End};
+        const shortcuts = {
+            selectAll: [[ctrl], K.KEY_a],
+            cut: [clip, K.KEY_x],
+            copy: [clip, K.KEY_c],
+            paste: [clip, K.KEY_v],
+            undo: [[ctrl], K.KEY_z],
+            redo: [[ctrl, shift], K.KEY_z],
+            backspace: [[], K.KEY_BackSpace],
+        };
+        let entry;
+        if (moves[action])
+            entry = {keyval: moves[action], modifiers: select ? [shift] : []};
+        else if (shortcuts[action])
+            entry = {keyval: shortcuts[action][1], modifiers: shortcuts[action][0]};
+        else
+            return;
+        // The text and cursor are no longer what we tracked.
+        this._resetText();
+        this._pressKeys([entry]);
     }
 
     _isDoubleSpace() {
