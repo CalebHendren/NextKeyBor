@@ -79,7 +79,14 @@ const char *const kEnglishExtras[] = {
     "Reddit", "subreddit", "subreddits", "upvote", "upvoted", "downvote", "TikTok", "WhatsApp", "Spotify",
     "Snapchat", "LinkedIn", "Gmail", "ChatGPT", "Pinterest", "Tumblr", "Venmo", "Airbnb", "Lyft", "DoorDash",
     "Xbox", "Minecraft", "Roblox", "Etsy", "Hulu", "iCloud", "macOS", "Siri", "YouTube", "YouTuber", "apps",
-    "memes", "emojis", "omg", "idk", "tbh",
+    "memes", "emojis", "omg", "idk", "tbh", "thx", "pls", "plz", "jk", "smh", "lol", "lmao", "brb", "btw",
+    "imo", "fyi", "ikr", "nvm", "ppl",
+};
+
+// Words in the dictionary that phone keyboards still fix, because people
+// nearly always mean the other: "cant" is a word, but rarely the one meant.
+const std::pair<const char *, const char *> kEnglishFixes[] = {
+    {"alot", "a lot"}, {"cant", "can't"}, {"wont", "won't"},
 };
 
 std::map<std::string, std::unique_ptr<Model>> g_models;
@@ -978,6 +985,7 @@ std::vector<std::string> Model::swipe(const std::string &context, const std::map
 
 constexpr double kAutocorrectMinLikelihood = 1.0 / 30000;  // corrections must be fairly common words
 constexpr double kAutocorrectMargin = 2.0;     // and this many times likelier than the next best
+constexpr double kAutocorrectShortMargin = 4.0;  // or this many for words of three letters or fewer
 constexpr double kAutocorrectMisspelt = 20.0;  // how much likelier a fix must be than a listed misspelling
 
 // The user's text shortcuts (setting text-shortcuts): "omw" -> "On my way!".
@@ -1035,6 +1043,10 @@ std::string Model::autocorrect(const std::string &context, bool fix_typos) {
     }
 
     const std::string key = fold(typed);
+    if (freq_code() == "en" && !user_["unigrams"].contains(typed))
+        for (const auto &[from, to] : kEnglishFixes)
+            if (key == from)
+                return match_case(typed, to);
     auto known = exact_.find(key);
     // "dont" -> "don't", "im" -> "I'm": the frequency list has contractions
     // without their apostrophes, but the dictionary has them right.
@@ -1081,7 +1093,9 @@ std::string Model::autocorrect(const std::string &context, bool fix_typos) {
             second = p;
         }
     }
-    if (best.empty() || first < kAutocorrectMinLikelihood || first < kAutocorrectMargin * second || first < typed_p)
+    // Short words have few neighbours, so a clear winner means less.
+    double margin = len <= 3 ? kAutocorrectShortMargin : kAutocorrectMargin;
+    if (best.empty() || first < kAutocorrectMinLikelihood || first < margin * second || first < typed_p)
         return "";
     return match_case(typed, best);
 }
