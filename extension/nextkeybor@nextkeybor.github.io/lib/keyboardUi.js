@@ -39,8 +39,9 @@ const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
 const FINISHED_WORD = /([\p{L}'’-]+) $/u;
 // A word finished with one of these is autocorrected.
 const AUTOCORRECT_TRIGGER = /^[ .,!?;:]$/;
-// Typed right after an automatic space, these take its place: "word. ".
-const SPACE_BEFORE = /^[.,!?;:]$/;
+// Typed right after an automatic space, these take its place: "word. ",
+// "(like this) ".
+const SPACE_BEFORE = /^[.,!?;:)]$/;
 const TERMINAL_WM_CLASS = /term|console|ptyxis|kitty|alacritty|wezterm|foot|konsole|tilix|terminator|blackbox|guake|tilda/i;
 
 function lastWord(text) {

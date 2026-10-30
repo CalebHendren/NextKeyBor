@@ -16,7 +16,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
   - slide along the space bar to move the cursor
   - double-tap shift for caps lock
   - an optional click sound on each key press (in settings)
-  - punctuation after an automatic space takes the space's place ("word ." → "word. ")
+  - punctuation or a closing bracket after an automatic space takes the space's place ("word ." → "word. ")
   - the ?123 page stays up while you type digits and symbols, and a space takes you back to the letters
 - **Resizable:** drag the handle on top of the keyboard to set its height, separately for landscape and portrait.
 - **Floating keyboard:** switch it on from the keyboard button in the top bar (hold it for the menu) or in settings. The keyboard becomes a panel you drag by its top bar; it opens where you left it, whether you tap a text field or the top bar button, and its X closes it.
