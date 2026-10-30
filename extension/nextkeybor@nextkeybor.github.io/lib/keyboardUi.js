@@ -47,6 +47,15 @@ const AUTOCORRECT_TRIGGER = /^[ .,!?;:]$/;
 // Typed right after an automatic space, these take its place: "word. ",
 // "(like this) ".
 const SPACE_BEFORE = /^[.,!?;:)]$/;
+// Fields where two spaces never mean the end of a sentence.
+const NO_PERIOD_PURPOSES = [
+    Clutter.InputContentPurpose.URL,
+    Clutter.InputContentPurpose.EMAIL,
+    Clutter.InputContentPurpose.NUMBER,
+    Clutter.InputContentPurpose.DIGITS,
+    Clutter.InputContentPurpose.PHONE,
+    Clutter.InputContentPurpose.PIN,
+];
 const TERMINAL_WM_CLASS = /term|console|ptyxis|kitty|alacritty|wezterm|foot|konsole|tilix|terminator|blackbox|guake|tilda/i;
 
 function lastWord(text) {
@@ -953,7 +962,7 @@ export class KeyboardUi {
 
     _isDoubleSpace() {
         if (!this._settings.get_boolean('double-space-period') ||
-            this._isTerminal() || this._isPassword())
+            this._isTerminal() || this._isPassword() || NO_PERIOD_PURPOSES.includes(this._ctrl?.purpose))
             return false;
         const sinceMs = (GLib.get_monotonic_time() - this._lastCommitTime) / 1000;
         return sinceMs < DOUBLE_SPACE_MS && /[\p{L}\p{N})"'”’] $/u.test(this._context());
