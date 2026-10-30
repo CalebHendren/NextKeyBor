@@ -629,7 +629,10 @@ export class KeyboardUi {
         } else if (name === 'clipboard') {
             panel = new ClipboardPanel(this._clipboard, {paste: text => this._commitToApp(text)});
         } else if (name === 'edit') {
-            panel = new EditPanel({edit: (action, select) => this._editText(action, select)});
+            panel = new EditPanel({
+                edit: (action, select) => this._editText(action, select),
+                terminal: this._isTerminal(),
+            });
         } else if (name === 'layout') {
             panel = new LayoutPanel(this._settings);
         } else {
@@ -919,8 +922,13 @@ export class KeyboardUi {
     _editText(action, select) {
         const K = Clutter;
         const ctrl = K.KEY_Control_L, shift = K.KEY_Shift_L;
+        const terminal = this._isTerminal();
+        // In a terminal Ctrl+Z suspends the job and Ctrl+A goes to the start
+        // of the line, so these do nothing there (the panel greys them out).
+        if (terminal && ['selectAll', 'undo', 'redo'].includes(action))
+            return;
         // Terminals copy and paste with Ctrl+Shift.
-        const clip = this._isTerminal() ? [ctrl, shift] : [ctrl];
+        const clip = terminal ? [ctrl, shift] : [ctrl];
         const moves = {left: K.KEY_Left, right: K.KEY_Right, up: K.KEY_Up, down: K.KEY_Down, home: K.KEY_Home, end: K.KEY_End};
         const shortcuts = {
             selectAll: [[ctrl], K.KEY_a],

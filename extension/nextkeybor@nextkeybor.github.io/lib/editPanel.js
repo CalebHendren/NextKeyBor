@@ -105,8 +105,9 @@ export const EditPanel = GObject.registerClass({
 }, class EditPanel extends St.BoxLayout {
     // edit(action, select): one of left, right, up, down, home, end (moving
     // the selection when select is true), selectAll, cut, copy, paste, undo,
-    // redo, backspace.
-    _init({edit}) {
+    // redo, backspace. In a terminal, selectAll, undo and redo are greyed
+    // out: Ctrl+Z would suspend the running job.
+    _init({edit, terminal = false}) {
         super._init({
             style_class: 'nkb-panel nkb-edit-panel',
             orientation: Clutter.Orientation.VERTICAL,
@@ -152,9 +153,17 @@ export const EditPanel = GObject.registerClass({
         key('go-next-symbolic', '', 'right', 2, 1, 1, 1, true);
         key('go-down-symbolic', '', 'down', 1, 2, 1, 1, true);
         // Right: editing.
-        key('edit-select-all-symbolic', 'Select all', 'selectAll', 4, 0);
-        key('edit-undo-symbolic', 'Undo', 'undo', 5, 0);
-        key('edit-redo-symbolic', 'Redo', 'redo', 6, 0);
+        const appOnly = [
+            key('edit-select-all-symbolic', 'Select all', 'selectAll', 4, 0),
+            key('edit-undo-symbolic', 'Undo', 'undo', 5, 0),
+            key('edit-redo-symbolic', 'Redo', 'redo', 6, 0),
+        ];
+        if (terminal) {
+            for (const button of appOnly) {
+                button.reactive = false;
+                button.opacity = 100;
+            }
+        }
         key('edit-cut-symbolic', 'Cut', 'cut', 4, 1);
         key('edit-copy-symbolic', 'Copy', 'copy', 5, 1);
         key('edit-paste-symbolic', 'Paste', 'paste', 6, 1);
