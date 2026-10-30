@@ -6,7 +6,7 @@
 
   All JSON strings are UTF-8 JSON documents; shapes are documented per method.
   Media item JSON (GIFs, stickers, own uploads):
-    {"id": "giphy:abc", "source": "giphy|tenor|klipy|openverse|local", "kind": "gif|sticker",
+    {"id": "giphy:abc", "source": "giphy|klipy|openverse|local", "kind": "gif|sticker",
      "title": "...", "preview": "/abs/path/to/cached/thumb.gif" or "",
      "preview_url": "https://...", "url": "https://... full gif", "favorite": true}
   "preview" is filled once the thumbnail is in the local cache; if it is empty,

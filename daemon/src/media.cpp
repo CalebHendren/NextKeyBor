@@ -98,7 +98,6 @@ bool text_matches(const std::string &query, const json &item) {
 json g_favorites = json::array();   // items + {"file", "preview_file", "added"}
 json g_library = json::array();     // own items + {"file", "added", "tags"}
 std::set<std::string> g_fav_ids;
-std::map<std::string, std::string> g_tenor_pos;  // "kind|query|offset" -> next pos token
 std::set<std::string> g_fav_fetching;            // favourite ids with a download running
 int g_downloads_since_prune = 0;
 
@@ -191,11 +190,11 @@ void attach_preview(json &item) {
 // ---- providers (worker threads) ----
 
 struct Query {
-    std::string provider, kind, query, key, rating, tenor_pos, client;
+    std::string provider, kind, query, key, rating, client;
     unsigned offset;
 };
 
-std::string tenor_filter(const std::string &rating) {
+std::string content_filter(const std::string &rating) {
     if (rating == "g")
         return "high";
     if (rating == "pg")
@@ -221,26 +220,6 @@ json parse_giphy(const Query &q, const json &body) {
         items.push_back({{"id", "giphy:" + d.value("id", "")}, {"source", "giphy"}, {"kind", q.kind},
                          {"title", d.value("title", "")}, {"preview_url", preview.empty() ? full : preview},
                          {"url", full}, {"preview", ""}});
-    }
-    return items;
-}
-
-json parse_tenor(const Query &q, const json &body, std::string &next) {
-    json items = json::array();
-    next = body.value("next", "");
-    bool sticker = q.kind == "sticker";
-    for (const auto &r : body.value("results", json::array())) {
-        const json &mf = r.value("media_formats", json::object());
-        auto url_of = [&](const char *k) { return mf.contains(k) ? mf[k].value("url", "") : std::string(); };
-        std::string preview = url_of(sticker ? "tinygif_transparent" : "tinygif");
-        std::string full = url_of(sticker ? "gif_transparent" : "gif");
-        if (full.empty())
-            full = url_of("gif");
-        if (full.empty())
-            continue;
-        items.push_back({{"id", "tenor:" + r.value("id", "")}, {"source", "tenor"}, {"kind", q.kind},
-                         {"title", r.value("content_description", "")},
-                         {"preview_url", preview.empty() ? full : preview}, {"url", full}, {"preview", ""}});
     }
     return items;
 }
@@ -316,7 +295,7 @@ json parse_openverse(const Query &q, const json &body) {
     return items;
 }
 
-json run_query(const Query &q, std::string &error, std::string &tenor_next) {
+json run_query(const Query &q, std::string &error) {
     std::string url;
     bool trending = trim(q.query).empty();
     std::string esc = url_escape(q.query);
@@ -325,13 +304,6 @@ json run_query(const Query &q, std::string &error, std::string &tenor_next) {
               (trending ? "/trending?" : "/search?q=" + esc + "&") + "api_key=" + url_escape(q.key) +
               "&limit=" + std::to_string(kPageSize) + "&offset=" + std::to_string(q.offset) +
               "&rating=" + q.rating + "&bundle=messaging_non_clips";
-    } else if (q.provider == "tenor") {
-        url = std::string("https://tenor.googleapis.com/v2/") + (trending ? "featured?" : "search?q=" + esc + "&") +
-              "key=" + url_escape(q.key) + "&client_key=nextkeybor&limit=" + std::to_string(kPageSize) +
-              "&contentfilter=" + tenor_filter(q.rating) +
-              (q.kind == "sticker" ? "&searchfilter=sticker&media_filter=gif_transparent,tinygif_transparent,gif"
-                                   : "&media_filter=gif,tinygif") +
-              (q.tenor_pos.empty() ? "" : "&pos=" + url_escape(q.tenor_pos));
     } else if (q.provider == "openverse") {
         // No trending feed; show something lively for an empty query.
         std::string terms = trending ? "animated" : q.query;
@@ -343,7 +315,7 @@ json run_query(const Query &q, std::string &error, std::string &tenor_next) {
         url = "https://api.klipy.com/api/v1/" + url_escape(q.key) + "/" +
               (q.kind == "sticker" ? "stickers" : "gifs") + (trending ? "/trending?" : "/search?q=" + esc + "&") +
               "page=" + std::to_string(q.offset / kPageSize + 1) + "&per_page=" + std::to_string(kPageSize) +
-              "&customer_id=" + url_escape(q.client) + "&content_filter=" + tenor_filter(q.rating);
+              "&customer_id=" + url_escape(q.client) + "&content_filter=" + content_filter(q.rating);
     }
     auto r = http_get(url);
     if (!r.ok()) {
@@ -369,8 +341,6 @@ json run_query(const Query &q, std::string &error, std::string &tenor_next) {
         json body = json::parse(r.body);
         if (q.provider == "giphy")
             return parse_giphy(q, body);
-        if (q.provider == "tenor")
-            return parse_tenor(q, body, tenor_next);
         if (q.provider == "openverse")
             return parse_openverse(q, body);
         return parse_klipy(q, body);
@@ -385,7 +355,9 @@ json run_query(const Query &q, std::string &error, std::string &tenor_next) {
 // The chosen provider, or Openverse (no key needed) until it has a key.
 std::string effective_provider() {
     std::string provider = setting_string("gif-provider", "openverse");
-    if (provider != "openverse" && setting_string((provider + "-api-key").c_str(), "").empty())
+    if (provider != "giphy" && provider != "klipy")
+        return "openverse";
+    if (setting_string((provider + "-api-key").c_str(), "").empty())
         return "openverse";
     return provider;
 }
@@ -403,18 +375,6 @@ std::string search(const std::string &kind_in, const std::string &query, unsigne
     if (q.provider != "openverse")
         q.key = setting_string((q.provider + "-api-key").c_str(), "");
     q.client = client_id();
-    std::string pos_key = q.kind + "|" + query + "|" + std::to_string(offset);
-    if (q.provider == "tenor" && offset > 0) {
-        auto it = g_tenor_pos.find(pos_key);
-        if (it == g_tenor_pos.end()) {
-            // No page token for this offset: nothing more to show.
-            run_on_main([request_id] {
-                Service::get().emit("MediaResults", g_variant_new("(ss)", request_id.c_str(), "[]"));
-            });
-            return request_id;
-        }
-        q.tenor_pos = it->second;
-    }
     if (q.key.empty() && q.provider != "openverse") {
         std::string msg = "No API key for " + q.provider + ". Add one in NextKeyBor settings (" + q.provider +
                           "-api-key).";
@@ -423,16 +383,14 @@ std::string search(const std::string &kind_in, const std::string &query, unsigne
         });
         return request_id;
     }
-    run_in_worker([q, request_id, pos_key] {
-        std::string error, next;
-        json items = run_query(q, error, next);
-        run_on_main([request_id, items, error, next, pos_key, q]() mutable {
+    run_in_worker([q, request_id] {
+        std::string error;
+        json items = run_query(q, error);
+        run_on_main([request_id, items, error]() mutable {
             if (!error.empty()) {
                 Service::get().emit("MediaError", g_variant_new("(ss)", request_id.c_str(), error.c_str()));
                 return;
             }
-            if (!next.empty())
-                g_tenor_pos[q.kind + "|" + q.query + "|" + std::to_string(q.offset + kPageSize)] = next;
             for (auto &it : items)
                 attach_preview(it);
             Service::get().emit("MediaResults", g_variant_new("(ss)", request_id.c_str(), items.dump().c_str()));

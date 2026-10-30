@@ -1,4 +1,4 @@
-// GIFs and stickers: online search (GIPHY, Tenor, KLIPY), local cache,
+// GIFs and stickers: online search (GIPHY, KLIPY, Openverse), local cache,
 // favourites that work offline, and the user's own imported library.
 #pragma once
 

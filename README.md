@@ -21,8 +21,9 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
 - **Floating keyboard:** switch it on from the keyboard button in the top bar (hold it for the menu) or in settings. The keyboard becomes a panel you drag by its top bar; it opens where you left it, whether you tap a text field or the top bar button, and its X closes it.
 - **Screenshots:** the camera button opens GNOME's screenshot tool (area, window or screen; picture or video).
 - **Hold for special characters:** long-press top-row letters for the digits 1–0. Other keys give common symbols, alongside GNOME's accented letters.
+- **Number row:** an optional row of digits above the letters (in settings); hold a digit for fractions and superscripts.
 - **Emoji and symbol search:** find emoji by name in your own language (using Unicode CLDR data) and search more than 1,100 symbols (arrows, currency, maths…).
-- **GIFs and stickers:** search online results from GIPHY, Tenor or KLIPY with a free API key, or from Openverse with no key at all (openly licensed, mostly Wikimedia animations). You can:
+- **GIFs and stickers:** search online results from GIPHY or KLIPY with a free API key, or from Openverse with no key at all (openly licensed, mostly Wikimedia animations). You can:
   - favourite items (saved locally, so they work offline)
   - import your own GIFs through the system file picker
   - search your favourites and your own GIFs too.
@@ -53,7 +54,7 @@ sudo apt install cmake ninja-build g++ libglib2.0-dev libcurl4-openssl-dev pipew
 
 Then log out and back in. Download a speech model from the 🌐 button on the keyboard. The `base` model is 142 MB and supports many languages.
 
-GIF search works straight away through Openverse. For GIPHY, KLIPY or Tenor results, add a free API key: `gnome-extensions prefs nextkeybor@nextkeybor.github.io`.
+GIF search works straight away through Openverse. For GIPHY or KLIPY results, add a free API key: `gnome-extensions prefs nextkeybor@nextkeybor.github.io`.
 
 For cloud dictation with GroqType, run `./install.sh --with-groqtype` (add `GROQ_API_KEY=...` in front to save your key). It downloads only GroqType's command-line tool, which needs no root; a full GroqType install works too.
 

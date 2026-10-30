@@ -7,7 +7,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {DaemonClient} from './lib/daemon.js';
 import {Floating, KeyboardIndicator} from './lib/floating.js';
 import {TapFix, updateLevelFromHints} from './lib/fixes.js';
-import {augmentRow, centreSpaceBar, replaceWwwKey} from './lib/holds.js';
+import {augmentRow, centreSpaceBar, numberRowFor, replaceWwwKey} from './lib/holds.js';
 import {KeyboardUi, MAX_HEIGHT_RATIO} from './lib/keyboardUi.js';
 
 // Earlier single-purpose fixes that NextKeyBor includes; running both would
@@ -35,7 +35,7 @@ export default class NextKeyBorExtension extends Extension {
         this._settings.connectObject('changed', (_s, key) => {
             if (key === 'chromium-tap-fix')
                 this._syncTapFix();
-            else if (key === 'hold-for-numbers')
+            else if (key === 'hold-for-numbers' || key === 'number-row')
                 this._rebuildKeys();
             else if (key === 'height-landscape' || key === 'height-portrait')
                 Main.keyboard._keyboard?._relayout();
@@ -179,9 +179,24 @@ export default class NextKeyBorExtension extends Extension {
             } catch (e) {
                 console.error(`NextKeyBor: www. key replacement failed: ${e}`);
             }
+            // Rows as the layout file counts them, before any number row.
+            let row = layout._nRows - (layout._nkbAddedRows ?? 0);
+            if (settings.get_boolean('number-row')) {
+                try {
+                    const digits = numberRowFor(keys, row, layout.mode);
+                    if (digits) {
+                        orig._addRowKeys.call(this, digits, layout, ...rest);
+                        layout.appendRow();
+                        layout._nkbAddedRows = (layout._nkbAddedRows ?? 0) + 1;
+                        row = layout._nRows - layout._nkbAddedRows;
+                    }
+                } catch (e) {
+                    console.error(`NextKeyBor: number row failed: ${e}`);
+                }
+            }
             if (settings.get_boolean('hold-for-numbers')) {
                 try {
-                    augmentRow(keys, layout._nRows, layout.mode);
+                    augmentRow(keys, row, layout.mode);
                 } catch (e) {
                     console.error(`NextKeyBor: long-press variants failed: ${e}`);
                 }

@@ -9,7 +9,7 @@ const BUS_NAME = 'io.github.nextkeybor.Daemon';
 const OBJECT_PATH = '/io/github/nextkeybor/Daemon';
 
 const MODELS = ['tiny', 'base', 'small', 'medium', 'large-v3-turbo', 'large-v3', 'tiny.en', 'base.en', 'small.en'];
-const PROVIDERS = [['openverse', 'Openverse (no key)'], ['giphy', 'GIPHY'], ['klipy', 'KLIPY'], ['tenor', 'Tenor']];
+const PROVIDERS = [['openverse', 'Openverse (no key)'], ['giphy', 'GIPHY'], ['klipy', 'KLIPY']];
 const RATINGS = [['g', 'G'], ['pg', 'PG'], ['pg-13', 'PG-13'], ['r', 'R']];
 const ENGINES = [['auto', 'Automatic'], ['whisper', 'On this computer (whisper.cpp)'], ['groqtype', 'GroqType (Groq cloud)']];
 const GROQTYPE_URL = 'https://github.com/dixonSolutions/GroqType';
@@ -225,6 +225,8 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         const holds = new Adw.PreferencesGroup({title: 'Keys'});
         holds.add(switchRow(settings, 'hold-for-numbers', 'Hold for numbers and symbols',
             'Long-press the top row for digits, other letters for symbols'));
+        holds.add(switchRow(settings, 'number-row', 'Number row',
+            'A row of digits above the letters; hold a digit for fractions and superscripts'));
         holds.add(switchRow(settings, 'swipe-typing', 'Swipe typing',
             'Slide across the letters to type a word; lift to finish'));
         holds.add(switchRow(settings, 'key-popups', 'Key popups',

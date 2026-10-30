@@ -75,6 +75,10 @@
       <default>true</default>
       <summary>Long-press top-row letters for digits and other keys for symbols</summary>
     </key>
+    <key name="number-row" type="b">
+      <default>false</default>
+      <summary>Show a row of digits above the letters</summary>
+    </key>
     <key name="swipe-typing" type="b">
       <default>true</default>
       <summary>Type words by sliding across the letters</summary>
@@ -150,10 +154,6 @@
     <key name="giphy-api-key" type="s">
       <default>''</default>
       <summary>GIPHY API key (free at developers.giphy.com)</summary>
-    </key>
-    <key name="tenor-api-key" type="s">
-      <default>''</default>
-      <summary>Tenor API key (Google Cloud)</summary>
     </key>
     <key name="klipy-api-key" type="s">
       <default>''</default>

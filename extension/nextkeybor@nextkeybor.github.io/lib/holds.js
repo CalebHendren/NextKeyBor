@@ -55,6 +55,33 @@ export function augmentRow(keys, rowIndex, levelMode) {
     }
 }
 
+// Long-press on the number row: superscripts and fractions, as on Gboard.
+const DIGIT_VARIANTS = {
+    '1': ['¹', '½', '⅓', '¼', '⅛'],
+    '2': ['²', '⅔'],
+    '3': ['³', '¾', '⅜'],
+    '4': ['⁴'],
+    '5': ['⅝'],
+    '7': ['⅞'],
+    '0': ['ⁿ', '∅'],
+};
+
+// The keys of a row of digits 1–0 to put above this row, lined up with its
+// letters (the stock letter levels have no number row), or null when the row
+// is not the top letter row. `rowIndex` and `levelMode` as for augmentRow.
+export function numberRowFor(keys, rowIndex, levelMode) {
+    if (rowIndex !== 1 || (levelMode !== 'default' && levelMode !== 'latched'))
+        return null;
+    const first = keys.findIndex(isLetterKey);
+    if (first < 0 || keys.filter(isLetterKey).length < 7)
+        return null;
+    const offset = keys.slice(0, first).reduce((sum, k) => sum + (k.width ?? 1), 0);
+    return TOP_ROW.map((digit, i) => ({
+        strings: [digit, ...(DIGIT_VARIANTS[digit] ?? [])],
+        leftOffset: i === 0 ? offset : 0,
+    }));
+}
+
 // The stock URL layout's "www." key: a tap types ".com", the long-press popup
 // offers other common endings, and keeps "www.".
 const URL_ENDINGS = ['.com', '.org', '.net', '.io', '.dev', 'www.'];
