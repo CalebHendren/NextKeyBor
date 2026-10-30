@@ -9,10 +9,13 @@ Checks, on the stock US layout:
   then space           -> "teh "  (not corrected again)
   "teh" + space again  -> "teh "  (still not corrected)
 
-Needs the session from tools/nested/restart.sh with the keyboard open on the
-letter level and no panel showing; --layout and --grid as for swipe_test.py.
-The test session's daemon shares your word list, so "teh" is forgotten again
-at the end (it is then never suggested).
+Needs a fresh session from tools/nested/restart.sh with the keyboard open on
+the letter level and no panel showing (after the undo, the keyboard leaves
+"teh" alone until the text field changes, so run it once per session);
+--layout and --grid as for swipe_test.py.
+The test session's daemon shares your word list and learns what the test
+types, so "teh" is forgotten before and after the run (it is then never
+suggested).
 """
 import os
 import subprocess
@@ -65,6 +68,12 @@ def main():
         for c in chars:
             d.tap(*keys[c])
 
+    def forget_teh():
+        subprocess.run(["gdbus", "call", "--session", "-d", "io.github.nextkeybor.Daemon",
+                        "-o", "/io/github/nextkeybor/Daemon", "-m", "io.github.nextkeybor.Daemon.ForgetWord", "teh"],
+                       env={**os.environ, "DBUS_SESSION_BUS_ADDRESS": bus}, check=False, capture_output=True)
+
+    forget_teh()  # an earlier run may have taught it
     # Start on a fresh word.
     if text() and not text()[-1].isspace():
         tap(" ")
@@ -86,9 +95,7 @@ def main():
         ok += good
         print(f"{'ok ' if good else 'BAD'} {name:18} -> {got!r} (want {want!r})")
 
-    subprocess.run(["gdbus", "call", "--session", "-d", "io.github.nextkeybor.Daemon",
-                    "-o", "/io/github/nextkeybor/Daemon", "-m", "io.github.nextkeybor.Daemon.ForgetWord", "teh"],
-                   env={**os.environ, "DBUS_SESSION_BUS_ADDRESS": bus}, check=False, capture_output=True)
+    forget_teh()
     print(f"{ok}/{len(checks)} checks passed")
     sys.exit(0 if ok == len(checks) else 1)
 
