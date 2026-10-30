@@ -15,6 +15,7 @@ import {waitForSignal} from './daemon.js';
 import {EditPanel} from './editPanel.js';
 import {EmojiPanel, LanguagePanel, MediaPanel} from './panels.js';
 import {KeyGestures} from './gestures.js';
+import {splitGap} from './layoutModes.js';
 import {SwipeTyper, letterKeyCentres} from './swipe.js';
 import {connectTap, iconButton, labelButton, setChecked} from './widgets.js';
 
@@ -33,6 +34,7 @@ const SCREENSHOT_DELAY_MS = 250;
 const KEY_GAP_MS = 15;
 const DOUBLE_SPACE_MS = 1000;
 const BOUNCE_MARGIN_MS = 30;
+const SPLIT_CHECK_MS = 250;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
 // The word just finished with a space, for emoji suggestions.
@@ -149,7 +151,13 @@ export class KeyboardUi {
         keyboard.connectObject('notify::translation-y',
             () => Main.layoutManager._queueUpdateRegions(), this);
         // Not notify::width: relayouts emit it too, and _layoutPanel relayouts.
-        Main.layoutManager.connectObject('monitors-changed', () => this._layoutPanel(), this);
+        Main.layoutManager.connectObject('monitors-changed', () => {
+            this._layoutPanel();
+            this._queueSplitCheck();
+        }, this);
+        // The split keyboard's gap depends on the keys' height (and turns
+        // off in portrait).
+        keyboard._aspectContainer?.connectObject('notify::height', () => this._queueSplitCheck(), this);
         keyboard.connectObject('visibility-changed', () => {
             if (!keyboard.visible) {
                 this.closePanel();
@@ -171,6 +179,8 @@ export class KeyboardUi {
         settings.connectObject('changed', (_s, key) => {
             if (key === 'speech-language')
                 this._syncMicLabel();
+            if (key === 'floating')
+                this._queueSplitCheck();
             if (key === 'gif-provider' || key.endsWith('-api-key') || key === 'floating' ||
                 key === 'clipboard-history')
                 this._syncVisibility();
@@ -197,6 +207,9 @@ export class KeyboardUi {
         if (this._keyQueueId)
             GLib.source_remove(this._keyQueueId);
         this._keyQueueId = 0;
+        if (this._splitCheckId)
+            GLib.source_remove(this._splitCheckId);
+        this._splitCheckId = 0;
         if (this._dictation.id && this._dictation.state === 'recording')
             this._daemon.cancelDictation(this._dictation.id).catch(() => {});
 
@@ -213,6 +226,7 @@ export class KeyboardUi {
         if (alive) {
             kb._focusTracker?.disconnectObject(this);
             kb._keyboardController?.disconnectObject(this);
+            kb._aspectContainer?.disconnectObject(this);
             kb.disconnectObject(this);
             this._unhookController();
             this.closePanel();
@@ -234,6 +248,38 @@ export class KeyboardUi {
     resetGestures() {
         this._swipe.reset();
         this._gestures.reset();
+    }
+
+    // ---- split keyboard ----------------------------------------------------
+
+    _queueSplitCheck() {
+        if (this._splitCheckId)
+            GLib.source_remove(this._splitCheckId);
+        this._splitCheckId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, SPLIT_CHECK_MS, () => {
+            this._splitCheckId = 0;
+            this._checkSplit();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    // Rebuild the keys when the split gap they were built with no longer
+    // fits (first allocation, height or orientation changed).
+    _checkSplit() {
+        const kb = this._kb;
+        const keys = kb?._aspectContainer;
+        if (!keys?.visible || !keys.height)
+            return;
+        kb._nkbKeysHeight = keys.height;
+        // Measured on the letters (the level with the number row, if any).
+        const want = splitGap(kb, this._settings, this._floating, kb._nkbSplitWidth ?? 0,
+            this._settings.get_boolean('number-row'));
+        if (Math.abs(want - (kb._nkbSplitGap ?? 0)) < 1 && (want > 0) === (kb._nkbSplitGap > 0))
+            return;
+        try {
+            kb._updateKeys();
+        } catch (e) {
+            console.error(`NextKeyBor: rebuilding keys failed: ${e}`);
+        }
     }
 
     // GNOME's own screenshot UI (area, window or screen; picture or video).

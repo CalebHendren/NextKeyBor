@@ -115,6 +115,10 @@
       <default>60</default>
       <summary>Floating keyboard width, in percent of the screen width</summary>
     </key>
+    <key name="split-landscape" type="b">
+      <default>false</default>
+      <summary>In landscape, split the keys into two halves at the screen edges, for typing with both thumbs</summary>
+    </key>
     <key name="float-x" type="d">
       <default>-1</default>
       <summary>Floating keyboard left edge, as a fraction of the screen width (-1: centred)</summary>

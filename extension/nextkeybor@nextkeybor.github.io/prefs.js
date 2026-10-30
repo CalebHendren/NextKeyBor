@@ -239,6 +239,8 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
             'Keeps your swipes and the words you meant in ~/.local/share/nextkeybor; never sent anywhere'));
         holds.add(switchRow(settings, 'clipboard-history', 'Clipboard history',
             'The last texts you copied, to paste from the keyboard; kept in memory only, never on disk'));
+        holds.add(switchRow(settings, 'split-landscape', 'Split keyboard in landscape',
+            'Two halves at the screen edges, for typing with both thumbs'));
         holds.add(switchRow(settings, 'floating', 'Floating keyboard',
             'A panel you drag by its top bar; it opens where you left it'));
         holds.add(spinRow(settings, 'float-width', 'Floating width', 30, 100, 'Percent of the screen width'));

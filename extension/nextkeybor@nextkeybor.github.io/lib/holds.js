@@ -119,3 +119,35 @@ export function centreSpaceBar(keys) {
     fill(right, false);
     keys[space].width = width;
 }
+
+// Split keyboard: rows split at the key boundary nearest this fraction of
+// their width (qwert|yuiop, asdfg|hjkl, zxcv|bnm on the stock layouts).
+export const SPLIT_AT = 0.46;
+
+export function rowWidth(keys) {
+    return keys.reduce((sum, k) => sum + (k.leftOffset ?? 0) + (k.width ?? 1), 0);
+}
+
+// Where to split the row: the index of the first key of its right half,
+// at the key boundary nearest column `at`, or -1. A space bar across that
+// column becomes two, one on each side of the split.
+export function splitRow(keys, at) {
+    let column = 0, best = -1, bestDistance = Infinity;
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const start = column + (key.leftOffset ?? 0);
+        const end = start + (key.width ?? 1);
+        if (key.strings?.[0] === ' ' && !key.action && start < at && end > at) {
+            const cut = Math.clamp(Math.round(at * 2) / 2, start + 0.5, end - 0.5);
+            key.width = cut - start;
+            keys.splice(i + 1, 0, {...key, strings: [...key.strings], width: end - cut, leftOffset: 0});
+            return i + 1;
+        }
+        if (i > 0 && Math.abs(start - at) < bestDistance) {
+            best = i;
+            bestDistance = Math.abs(start - at);
+        }
+        column = end;
+    }
+    return best;
+}
