@@ -12,6 +12,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {waitForSignal} from './daemon.js';
 import {EmojiPanel, LanguagePanel, MediaPanel} from './panels.js';
+import {KeyGestures} from './gestures.js';
 import {SwipeTyper} from './swipe.js';
 import {connectTap, iconButton, labelButton, setChecked} from './widgets.js';
 
@@ -32,6 +33,10 @@ const DOUBLE_SPACE_MS = 1000;
 const BOUNCE_MARGIN_MS = 30;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
+// A word finished with one of these is autocorrected.
+const AUTOCORRECT_TRIGGER = /^[ .,!?;:]$/;
+// Typed right after an automatic space, these take its place: "word. ".
+const SPACE_BEFORE = /^[.,!?;:]$/;
 const TERMINAL_WM_CLASS = /term|console|ptyxis|kitty|alacritty|wezterm|foot|konsole|tilix|terminator|blackbox|guake|tilda/i;
 
 function lastWord(text) {
@@ -83,11 +88,17 @@ export class KeyboardUi {
         this._dictation = {id: null, state: 'idle'};
         this.extraHeight = 0;
 
-        this._swipeResult = null; // {text, lead, space, words} of the last swiped word
+        this._swipeResult = null; // {text, lead, space, words, picked, log, retry} of the last swiped word
+        this._swipeRetype = null; // log entry of an undone swipe, waiting for the word typed instead
         this._keyQueue = [];
         this._keyQueueId = 0;
         this._a11yKeyboard = new Gio.Settings({schema_id: 'org.gnome.desktop.a11y.keyboard'});
-        this._swipeDelete = false;
+        this._deleteHandled = false; // a Backspace press already undid a swipe or correction
+        this._autocorrect = null; // {partial, fix}: what finishing the current word will make it
+        this._autocorrectSerial = 0;
+        this._corrected = null; // {original, fix, sep} of the correction just made
+        this._keepWord = ''; // a word whose correction was undone
+        this._autoSpace = false; // the last character typed is a space we added (suggestion, swipe)
 
         this._buildToolbar();
         this._buildResizeHandle();
@@ -99,6 +110,17 @@ export class KeyboardUi {
                 this._daemon.available && !this._isPassword(),
             onSwipe: (keys, path, shifted) => this._onSwipe(keys, path, shifted)
                 .catch(e => console.error(`NextKeyBor: swipe failed: ${e}`)),
+        });
+
+        this._gestures = new KeyGestures(keyboard, {
+            settings,
+            enabled: () => !this._panel,
+            moveCursor: keyval => {
+                this._settleSwipe();
+                this._corrected = null;
+                this._pressKeys([keyval]);
+            },
+            cursorMoved: () => this._resetText(),
         });
 
         Main.inputMethod.connectObject('surrounding-text-set', () => {
@@ -123,6 +145,7 @@ export class KeyboardUi {
         keyboard.connectObject('visibility-changed', () => {
             if (!keyboard.visible) {
                 this.closePanel();
+                this._settleSwipe();
                 this._flushLearn();
             } else {
                 this._scheduleSuggest(0);
@@ -174,6 +197,7 @@ export class KeyboardUi {
         this._settings.disconnectObject(this);
 
         this._swipe.destroy();
+        this._gestures.destroy();
 
         const kb = this._kb;
         const alive = !kb._nkbDestroyed;
@@ -560,13 +584,24 @@ export class KeyboardUi {
                 return Promise.resolve();
             }
             const plain = !modifiers || modifiers.size === 0;
+            this._kb._nkbLastCommit = plain ? str : null;
+            this._corrected = null;
+            const autoSpace = this._autoSpace;
+            this._autoSpace = false;
+            if (plain && autoSpace && SPACE_BEFORE.test(str) && / $/.test(this._context())) {
+                this._settleSwipe();
+                this._replaceBeforeCursor(1, `${str} `);
+                return Promise.resolve();
+            }
             // Double-tap space after a word: replace the first space with ". ".
             if (plain && str === ' ' && this._isDoubleSpace()) {
-                this._swipeResult = null;
+                this._settleSwipe();
                 this._replaceBeforeCursor(1, '. ');
                 return Promise.resolve();
             }
-            this._swipeResult = null;
+            if (plain && AUTOCORRECT_TRIGGER.test(str) && this._applyAutocorrect(str))
+                return Promise.resolve();
+            this._settleSwipe();
             const promise = this._orig.commit.call(ctrl, str, modifiers);
             if (plain)
                 this._onTextCommitted(str);
@@ -583,15 +618,26 @@ export class KeyboardUi {
                 return;
             }
             const wasEnabled = ctrl._deleteEnabled;
+            this._kb._nkbLastCommit = null;
+            this._autoSpace = false;
+            // Backspace right after a correction puts back what was typed.
+            if (enabled && !wasEnabled && this._corrected) {
+                ctrl._deleteEnabled = true;
+                this._deleteHandled = true;
+                this._revertCorrection(true);
+                return;
+            }
+            if (enabled)
+                this._corrected = null;
             // Backspace right after a swipe removes the whole swiped word.
             if (enabled && !wasEnabled && this._swipeResult) {
                 ctrl._deleteEnabled = true;
-                this._swipeDelete = true;
+                this._deleteHandled = true;
                 this._undoSwipe();
                 return;
             }
-            if (!enabled && this._swipeDelete) {
-                this._swipeDelete = false;
+            if (!enabled && this._deleteHandled) {
+                this._deleteHandled = false;
                 ctrl._deleteEnabled = false;
                 return;
             }
@@ -626,7 +672,10 @@ export class KeyboardUi {
                 this._panel.enter();
                 return;
             }
-            this._swipeResult = null;
+            this._settleSwipe();
+            this._corrected = null;
+            this._kb._nkbLastCommit = null;
+            this._autoSpace = false;
             this._orig.keyvalPress.call(ctrl, keyval);
             if (keyval === Clutter.KEY_Return || keyval === Clutter.KEY_KP_Enter)
                 this._onTextCommitted('\n');
@@ -740,7 +789,12 @@ export class KeyboardUi {
     }
 
     _resetText() {
-        this._swipeResult = null;
+        this._settleSwipe();
+        this._swipeRetype = null;
+        this._autocorrect = null;
+        this._corrected = null;
+        this._keepWord = '';
+        this._autoSpace = false;
         this._flushLearn();
         this._buffer = '';
         this._lastCommitTime = GLib.get_monotonic_time();
@@ -749,6 +803,13 @@ export class KeyboardUi {
 
     _onTextCommitted(str) {
         this._lastCommitTime = GLib.get_monotonic_time();
+        // The first word finished after an undone swipe is what it meant.
+        if (this._swipeRetype && /^[\s.,!?;:]/u.test(str)) {
+            const word = lastWord(this._buffer);
+            if (word)
+                this._logSwipe(this._swipeRetype, word, 'retyped');
+            this._swipeRetype = null;
+        }
         this._buffer = (this._buffer + str).slice(-MAX_BUFFER);
         if (!this._isPassword() && this._settings.get_boolean('learn-words')) {
             this._pendingLearn += str;
@@ -757,6 +818,7 @@ export class KeyboardUi {
                 (/\s$/.test(this._pendingLearn) && words >= LEARN_WORD_BATCH))
                 this._flushLearn();
         }
+        this._refreshAutocorrect();
         this._scheduleSuggest(SUGGEST_DELAY_MS);
     }
 
@@ -764,6 +826,7 @@ export class KeyboardUi {
         this._lastCommitTime = GLib.get_monotonic_time();
         this._buffer = [...this._buffer].slice(0, -1).join('');
         this._pendingLearn = [...this._pendingLearn].slice(0, -1).join('');
+        this._refreshAutocorrect();
         this._scheduleSuggest(SUGGEST_DELAY_MS);
     }
 
@@ -797,14 +860,29 @@ export class KeyboardUi {
             return;
         }
         const context = this._context();
-        const words = await this._daemon.suggest(context, '', MAX_SUGGESTIONS);
+        const partial = lastWord(context);
+        const [words, fix] = await Promise.all([
+            this._daemon.suggest(context, '', MAX_SUGGESTIONS),
+            this._fetchAutocorrect(context, partial),
+        ]);
         if (this._destroyed || serial !== this._suggestSerial)
             return;
+        this._setAutocorrect(partial, fix);
         this._suggestionBox.destroy_all_children();
-        const partial = lastWord(context);
-        words.forEach((word, i) => {
-            const shown = matchCase(word, partial);
-            this._addSuggestionButton(shown, word, i === 0 && !!partial, () => this._applySuggestion(shown));
+        // Just corrected: offer what was typed, to put it back.
+        const corrected = this._corrected;
+        if (corrected)
+            this._addSuggestionButton(corrected.original, null, false, () => this._revertCorrection(false));
+        // What a space will turn the word into comes first, in bold. With
+        // autocorrect off, the best completion is bold instead.
+        const ac = this._autocorrect;
+        let shown = words.map(word => matchCase(word, partial));
+        if (ac)
+            shown = [ac.fix, ...shown.filter(w => w !== ac.fix)];
+        const bold = !!ac || (!this._settings.get_boolean('autocorrect') && !!partial);
+        shown.slice(0, MAX_SUGGESTIONS - (corrected ? 1 : 0)).forEach((label, i) => {
+            this._addSuggestionButton(label, ac && i === 0 ? null : label, i === 0 && bold,
+                () => this._applySuggestion(label));
         });
     }
 
@@ -815,20 +893,84 @@ export class KeyboardUi {
             can_focus: false,
             x_expand: true,
         });
+        // Long-press forgets a word (word is null for ones that are not
+        // suggestions, such as an undone correction).
         connectTap(button, {
             onTap,
-            onLongPress: () => {
+            onLongPress: word ? () => {
                 this._daemon.forgetWord(word).catch(() => {});
                 button.destroy();
-            },
+            } : null,
         });
         this._suggestionBox.add_child(button);
     }
 
     _applySuggestion(word) {
         const partial = lastWord(this._context());
-        const text = word + (this._settings.get_boolean('auto-space') ? ' ' : '');
-        this._replaceBeforeCursor([...partial].length, text);
+        const space = this._settings.get_boolean('auto-space') ? ' ' : '';
+        this._replaceBeforeCursor([...partial].length, word + space);
+        this._autoSpace = !!space;
+    }
+
+    // ---- autocorrect -------------------------------------------------------
+
+    // Not where words are not prose: passwords, terminals, addresses, numbers.
+    _autocorrectAllowed() {
+        if (this._isPassword() || this._isTerminal())
+            return false;
+        const P = Clutter.InputContentPurpose;
+        const purpose = this._ctrl?.purpose ?? P.NORMAL;
+        return purpose === P.NORMAL || purpose === P.ALPHA;
+    }
+
+    // The replacement for the word being typed, or '' (the daemon also
+    // expands text shortcuts, with autocorrect on or off).
+    _fetchAutocorrect(context, partial) {
+        if (!partial || partial === this._keepWord || !this._daemon.available || !this._autocorrectAllowed())
+            return Promise.resolve('');
+        return this._daemon.autocorrect(context, '').catch(() => '');
+    }
+
+    _setAutocorrect(partial, fix) {
+        this._autocorrect = fix && partial && partial !== this._keepWord ? {partial, fix} : null;
+    }
+
+    // Ask at once after each key (suggestions wait a moment), so the answer
+    // is in before the space that finishes the word.
+    async _refreshAutocorrect() {
+        const serial = ++this._autocorrectSerial;
+        const context = this._context();
+        const partial = lastWord(context);
+        const fix = await this._fetchAutocorrect(context, partial);
+        if (!this._destroyed && serial === this._autocorrectSerial)
+            this._setAutocorrect(partial, fix);
+    }
+
+    // Space or punctuation sep finishes the word: type its correction (and
+    // sep) instead, if there is one. Returns whether it did.
+    _applyAutocorrect(sep) {
+        const ac = this._autocorrect;
+        const partial = lastWord(this._context());
+        if (!ac || !partial || ac.partial !== partial || !this._autocorrectAllowed())
+            return false;
+        this._settleSwipe();
+        this._autocorrect = null;
+        this._replaceBeforeCursor([...partial].length, ac.fix + sep);
+        this._corrected = {original: partial, fix: ac.fix, sep};
+        return true;
+    }
+
+    // Put back the word as typed (keeping the space or punctuation after it
+    // unless dropSep), and stop correcting it.
+    _revertCorrection(dropSep) {
+        const c = this._corrected;
+        this._corrected = null;
+        if (!c)
+            return;
+        this._replaceBeforeCursor([...(c.fix + c.sep)].length, c.original + (dropSep ? '' : c.sep));
+        this._keepWord = c.original;
+        this._autocorrect = null;
+        this._daemon.acceptWord(c.original).catch(() => {});
     }
 
     // Replace the len characters before the cursor with text.
@@ -859,6 +1001,8 @@ export class KeyboardUi {
     // ---- swipe typing -----------------------------------------------------
 
     async _onSwipe(keys, path, shifted) {
+        this._settleSwipe();
+        this._corrected = null;
         const context = this._context();
         const words = await this._daemon.swipeWords(context, '',
             JSON.stringify(keys), JSON.stringify(path), SWIPE_CHOICES);
@@ -869,8 +1013,13 @@ export class KeyboardUi {
         const lead = context && !/[\s(\[{"'“‘/-]$/u.test(context) ? ' ' : '';
         const space = this._settings.get_boolean('auto-space') ? ' ' : '';
         const text = lead + cased[0] + space;
+        // Swiping again after undoing one: that swipe meant this one's word.
+        const retry = this._swipeRetype;
+        this._swipeRetype = null;
         this._commitToApp(text);
-        this._swipeResult = {text, lead, space, words: cased};
+        const log = this._settings.get_boolean('swipe-log') ? {keys, path, context, choices: words} : null;
+        this._swipeResult = {text, lead, space, words: cased, picked: false, log, retry};
+        this._autoSpace = !!space;
         if (shifted && !this._kb._latched)
             this._kb._setActiveLevel('default');
     }
@@ -881,13 +1030,35 @@ export class KeyboardUi {
             return;
         const text = r.lead + word + r.space;
         this._replaceBeforeCursor([...r.text].length, text);
-        this._swipeResult = {...r, text, words: [word, ...r.words.filter(w => w !== word)]};
+        this._swipeResult = {...r, text, words: [word, ...r.words.filter(w => w !== word)], picked: true};
+        this._autoSpace = !!r.space;
     }
 
     _undoSwipe() {
         const r = this._swipeResult;
         this._swipeResult = null;
         this._replaceBeforeCursor([...r.text].length - [...r.lead].length, '');
+        this._swipeRetype = r.log ?? r.retry;
+    }
+
+    // The swiped word stays: log what the swipe meant (setting swipe-log).
+    _settleSwipe() {
+        const r = this._swipeResult;
+        this._swipeResult = null;
+        if (!r)
+            return;
+        const word = r.words[0];
+        if (r.log)
+            this._logSwipe(r.log, word, r.picked ? 'picked' : 'kept');
+        if (r.retry)
+            this._logSwipe(r.retry, word, 'reswiped');
+    }
+
+    _logSwipe(log, word, how) {
+        if (!this._settings.get_boolean('swipe-log') || !this._daemon.available)
+            return;
+        this._daemon.logSwipe({...log, word, how, time: new Date().toISOString()})
+            .catch(e => console.error(`NextKeyBor: swipe log: ${e}`));
     }
 
     // ---- dictation --------------------------------------------------------

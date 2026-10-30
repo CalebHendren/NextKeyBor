@@ -29,6 +29,57 @@ function switchRow(settings, key, title, subtitle = '') {
     return row;
 }
 
+// Editable list of text shortcuts (setting text-shortcuts, a{ss}): typing a
+// shortcut and a space types its phrase.
+function shortcutsGroup(settings) {
+    const group = new Adw.PreferencesGroup({
+        title: 'Text shortcuts',
+        description: 'Type a shortcut and a space (or punctuation) to type its phrase',
+    });
+    const rows = [];
+    const read = () => settings.get_value('text-shortcuts').deepUnpack();
+    const write = map => settings.set_value('text-shortcuts', new GLib.Variant('a{ss}', map));
+
+    const shortcut = new Adw.EntryRow({title: 'Shortcut'});
+    const phrase = new Adw.EntryRow({title: 'Phrase'});
+    const add = new Gtk.Button({icon_name: 'list-add-symbolic', valign: Gtk.Align.CENTER, tooltip_text: 'Add'});
+    add.add_css_class('flat');
+    phrase.add_suffix(add);
+    const addShortcut = () => {
+        const key = shortcut.text.trim();
+        if (!key || /\s/.test(key) || !phrase.text.trim())
+            return;
+        write({...read(), [key]: phrase.text.trim()});
+        shortcut.text = '';
+        phrase.text = '';
+    };
+    add.connect('clicked', addShortcut);
+    phrase.connect('entry-activated', addShortcut);
+    group.add(shortcut);
+    group.add(phrase);
+
+    const sync = () => {
+        for (const row of rows.splice(0))
+            group.remove(row);
+        for (const [key, text] of Object.entries(read()).sort()) {
+            const row = new Adw.ActionRow({title: GLib.markup_escape_text(key, -1), subtitle: GLib.markup_escape_text(text, -1)});
+            const remove = new Gtk.Button({icon_name: 'user-trash-symbolic', valign: Gtk.Align.CENTER, tooltip_text: 'Remove'});
+            remove.add_css_class('flat');
+            remove.connect('clicked', () => {
+                const map = read();
+                delete map[key];
+                write(map);
+            });
+            row.add_suffix(remove);
+            group.add(row);
+            rows.push(row);
+        }
+    };
+    settings.connect('changed::text-shortcuts', sync);
+    sync();
+    return group;
+}
+
 function entryRow(settings, key, title, password = false) {
     const row = password
         ? new Adw.PasswordEntryRow({title})
@@ -114,6 +165,7 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
                 kbRow.subtitle = [
                     k.physical?.length ? k.physical.join(', ') : 'none',
                     k.tablet_mode ? 'tablet mode' : null,
+                    k.unreadable_devices ? 'can\u2019t read input devices (join the \u201cinput\u201d group)' : null,
                     `OSK ${k.osk_enabled ? 'on' : 'off'}`,
                 ].filter(Boolean).join(' · ');
             } catch (e) {
@@ -148,16 +200,25 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         window.add(typing);
         const sugg = new Adw.PreferencesGroup({title: 'Suggestions'});
         sugg.add(switchRow(settings, 'suggestions-enabled', 'Word suggestions'));
+        sugg.add(switchRow(settings, 'autocorrect', 'Autocorrect',
+            'Fix clear typos when you finish a word; Backspace right after puts back what you typed'));
         sugg.add(switchRow(settings, 'auto-space', 'Add a space after a suggestion'));
         sugg.add(switchRow(settings, 'double-space-period', 'Double-tap space for a period'));
         sugg.add(switchRow(settings, 'learn-words', 'Learn new words', 'Stored only on this computer; never in password fields'));
         sugg.add(entryRow(settings, 'active-language', 'Dictionary language (e.g. en_US, pl_PL)'));
         typing.add(sugg);
+        typing.add(shortcutsGroup(settings));
         const holds = new Adw.PreferencesGroup({title: 'Keys'});
         holds.add(switchRow(settings, 'hold-for-numbers', 'Hold for numbers and symbols',
             'Long-press the top row for digits, other letters for symbols'));
         holds.add(switchRow(settings, 'swipe-typing', 'Swipe typing',
             'Slide across the letters to type a word; lift to finish'));
+        holds.add(switchRow(settings, 'key-popups', 'Key popups',
+            'Show the character above a key while you press it'));
+        holds.add(switchRow(settings, 'space-cursor', 'Move the cursor with the space bar',
+            'Slide along the space bar to move the text cursor'));
+        holds.add(switchRow(settings, 'swipe-log', 'Log swipes to improve swipe typing',
+            'Keeps your swipes and the words you meant in ~/.local/share/nextkeybor; never sent anywhere'));
         holds.add(switchRow(settings, 'floating', 'Floating keyboard',
             'A panel you drag by its top bar; it opens where you left it'));
         holds.add(spinRow(settings, 'float-width', 'Floating width', 30, 100, 'Percent of the screen width'));

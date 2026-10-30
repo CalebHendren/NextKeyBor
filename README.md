@@ -7,7 +7,15 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
 - **🎤 Dictation:** speak and the text goes straight into the app. It runs locally with [whisper.cpp](https://github.com/ggml-org/whisper.cpp), and you can pick the language (or leave it on auto-detect). Optionally, with [GroqType](https://github.com/dixonSolutions/GroqType) installed and a Groq API key set (in GroqType, or from NextKeyBor's settings), dictation uses Groq's cloud Whisper instead, falling back to the local model when offline.
 - **🌐 Languages:** switch the dictation language and your system keyboard layouts. It can also download spell-check dictionaries and language packs through PackageKit, the same system that GNOME Software uses.
 - **Autocomplete:** word completion, typo fixes and next-word prediction. It learns the words you type and keeps them only on your machine.
-- **Swipe typing:** slide across the letters and lift; a fading trail follows your finger. The best match is typed, the other matches wait in the suggestion bar, and backspace right after removes the whole word.
+- **Autocorrect:** clear typos are fixed when you finish the word with a space or punctuation ("teh" → "the", "dont" → "don't"). The fix shows in bold in the suggestion bar first. Backspace right after puts back what you typed, and that word is never corrected again. Passwords, terminals, web and email addresses are left alone.
+- **Text shortcuts:** type a shortcut and a space to type its phrase ("omw" → "On my way!"). Edit them in settings.
+- **Swipe typing:** slide across the letters and lift; a fading trail follows your finger. The best match is typed, the other matches wait in the suggestion bar, and backspace right after removes the whole word. Matching copes with how real fingers swipe: rounded corners, aiming off-centre, overshooting the last letter.
+- **Phone-keyboard touches:**
+  - a pressed key shows its character above your finger
+  - slide along the space bar to move the cursor
+  - double-tap shift for caps lock
+  - punctuation after an automatic space takes the space's place ("word ." → "word. ")
+  - the ?123 page stays up while you type digits and symbols, and a space takes you back to the letters
 - **Resizable:** drag the handle on top of the keyboard to set its height, separately for landscape and portrait.
 - **Floating keyboard:** switch it on from the keyboard button in the top bar (hold it for the menu) or in settings. The keyboard becomes a panel you drag by its top bar; it opens where you left it, whether you tap a text field or the top bar button, and its X closes it.
 - **Screenshots:** the camera button opens GNOME's screenshot tool (area, window or screen; picture or video).
@@ -17,7 +25,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
   - favourite items (saved locally, so they work offline)
   - import your own GIFs through the system file picker
   - search your favourites and your own GIFs too.
-- **Physical keyboard detection:** the on-screen keyboard switches on when no real keyboard can be used, and off again when one can. This covers a Type Cover folded back into tablet mode, a Bluetooth or USB keyboard being connected, and typing on a physical keyboard.
+- **Physical keyboard detection:** the on-screen keyboard switches on when no real keyboard can be used, and off again when one can. This covers a Type Cover folded back into tablet mode, a Bluetooth or USB keyboard being connected, and typing on a physical keyboard. It is off by default; it needs read access to `/dev/input` (`sudo usermod -aG input $USER`), and without it the daemon never switches the keyboard on.
 - **Fixes for GNOME's keyboard:**
   - The keyboard now opens when you tap text fields in Chromium, Electron and Qt apps. Mutter only opens it for apps that re-enable text input on each tap, which those apps don't do.
   - Shift no longer switches on by itself after every backspace in terminals and Chromium apps.
@@ -48,11 +56,23 @@ For cloud dictation with GroqType, run `./install.sh --with-groqtype` (add `GROQ
 
 To uninstall, run `./install.sh --uninstall`.
 
+## Tuning suggestions and swipe typing
+
+The daemon can be tried without the keyboard:
+
+```bash
+nextkeybord --suggest "i went to teh"          # suggestions and autocorrection for this text
+tools/swipe_bench.py > /tmp/swipes.jsonl         # 500 human-like swipes of common words
+nextkeybord --swipe-bench /tmp/swipes.jsonl      # top-1 / top-4 accuracy, misses, slowest swipes
+```
+
+To measure swipe typing on your own swipes, turn on "Log swipes to improve swipe typing" in settings. Each swipe is saved with the word you meant (the one you kept, the alternative you picked, or what you typed or swiped after undoing it) to `~/.local/share/nextkeybor/swipe-log.jsonl`, and `nextkeybord --swipe-bench` reads that file too.
+
 ## Data and privacy
 
 Everything stays on your machine unless you search for GIFs or stickers, which sends your query to the provider you picked.
 
-- Learned words, favourites and your own GIF library: `~/.local/share/nextkeybor/`
+- Learned words, favourites, your own GIF library and the swipe log (only when turned on): `~/.local/share/nextkeybor/`
 - Cache: `~/.cache/nextkeybor/`
 
 ## Licence
@@ -71,4 +91,4 @@ tools/nested/drive.py /tmp/nkb 'tap 700 450; wait 1; shot /tmp/k.png'
 
 With `mutter-devkit` installed (`sudo dnf install mutter-devkit`) the session also opens as a window you can use yourself; without it, `tools/nested/view.py /tmp/nkb` shows it live (view only).
 
-More in `tools/nested/`: `swipe_test.py` swipes words and checks what gets typed; `NKB_EXTENSIONS="['nextkeybor@nextkeybor.github.io']" tools/nested/restart.sh` limits the session to chosen extensions.
+More in `tools/nested/`: `swipe_test.py` swipes words with human-like finger paths (or `--straight` lines) and checks what gets typed (`--grid` gives the key positions if your keyboard size differs); `NKB_EXTENSIONS="['nextkeybor@nextkeybor.github.io']" tools/nested/restart.sh` limits the session to chosen extensions.

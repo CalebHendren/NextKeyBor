@@ -21,7 +21,7 @@
              "recording": bool, "language": "auto"},
             "gif_provider": "giphy", "gif_provider_ready": bool,
             "keyboard": {"physical": ["Name", ...], "tablet_mode": bool, "osk_enabled": bool,
-                         "auto_toggle": bool}} -->
+                         "auto_toggle": bool, "unreadable_devices": int}} -->
       <arg direction="out" type="s" name="status_json"/>
     </method>
 
@@ -80,15 +80,33 @@
       <arg direction="out" type="as" name="suggestions"/>
     </method>
     <method name="SwipeWords">
-      <!-- Swipe typing. keys: {"q": [x, y], ...} letter key centres; path: [[x, y], ...] finger
-           path; both in units of one letter key width. context: text before the cursor.
-           Returns up to max words, best first. -->
+      <!-- Swipe typing. keys: {"q": [x, y], ...} letter key centres; path: [[x, y, t], ...]
+           finger path, t in milliseconds (optional); positions in units of one letter key
+           width. context: text before the cursor. Returns up to max words, best first. -->
       <arg direction="in" type="s" name="context"/>
       <arg direction="in" type="s" name="language"/>
       <arg direction="in" type="s" name="keys"/>
       <arg direction="in" type="s" name="path"/>
       <arg direction="in" type="u" name="max"/>
       <arg direction="out" type="as" name="words"/>
+    </method>
+    <method name="Autocorrect">
+      <!-- What the word being typed at the end of context should become when it is finished
+           with a space or punctuation: a text shortcut's phrase, or a confident correction.
+           Empty to leave it as typed. -->
+      <arg direction="in" type="s" name="context"/>
+      <arg direction="in" type="s" name="language"/>
+      <arg direction="out" type="s" name="replacement"/>
+    </method>
+    <method name="AcceptWord">
+      <!-- The user undid a correction of this word: never correct it again. -->
+      <arg direction="in" type="s" name="word"/>
+    </method>
+    <method name="LogSwipe">
+      <!-- With the swipe-log setting on, appends one swipe ({"word", "keys", "path",
+           "context", ...} as JSON) to swipe-log.jsonl in the data directory, for tuning the
+           matcher (nextkeybord's swipe-bench option). Does nothing when the setting is off. -->
+      <arg direction="in" type="s" name="entry"/>
     </method>
     <method name="LearnText">
       <!-- Feed committed text (words, bigrams) into the user's personal dictionary. -->

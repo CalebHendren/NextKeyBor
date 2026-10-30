@@ -24,6 +24,8 @@ void usage() {
                  "  --replace            take over from a running nextkeybord\n"
                  "  --no-osk-toggle      detect keyboards but never switch the on-screen keyboard\n"
                  "  --transcribe FILE [LANG]  transcribe a 16 kHz mono WAV/raw f32 file and exit\n"
+                 "  --suggest TEXT [LANG]     print suggestions and autocorrection for TEXT and exit\n"
+                 "  --swipe-bench FILE [LANG]  score the swipe matcher on saved swipes and exit\n"
                  "  --status             print physical keyboard state as JSON and exit\n"
                  "  --version            print the version and exit\n";
 }
@@ -65,6 +67,10 @@ int main(int argc, char **argv) {
             return 0;
         } else if (!strcmp(argv[i], "--transcribe") && i + 1 < argc) {
             return nkb::speech::transcribe_file(argv[i + 1], i + 2 < argc ? argv[i + 2] : "auto");
+        } else if (!strcmp(argv[i], "--suggest") && i + 1 < argc) {
+            return nkb::predict::print_suggestions(argv[i + 1], i + 2 < argc ? argv[i + 2] : "");
+        } else if (!strcmp(argv[i], "--swipe-bench") && i + 1 < argc) {
+            return nkb::predict::swipe_bench(argv[i + 1], i + 2 < argc ? argv[i + 2] : "");
         } else if (!strcmp(argv[i], "--replace")) {
             replace = true;
         } else if (!strcmp(argv[i], "--no-osk-toggle")) {

@@ -111,7 +111,8 @@ class Trail {
 
 export class SwipeTyper {
     // onSwipe(keys, path, shifted) gets letter centres and the finger path in
-    // key-width units, and whether the keyboard showed capitals.
+    // key-width units (path points are [x, y, milliseconds since the touch
+    // began]), and whether the keyboard showed capitals.
     constructor(keyboard, {enabled, onSwipe}) {
         this._kb = keyboard;
         this._enabled = enabled;
@@ -146,6 +147,7 @@ export class SwipeTyper {
         // Compare slots: each event wraps its sequence in a new JS object.
         const slot = event.get_event_sequence()?.get_slot() ?? -1;
         const [x, y] = event.get_coords();
+        const time = event.get_time();
 
         if (type === T.TOUCH_BEGIN) {
             if (this._slot !== null || !this._enabled())
@@ -158,7 +160,7 @@ export class SwipeTyper {
                 this._slot = slot;
                 this._key = key;
                 this._keyPressed = !!pressed;
-                this._points = [[x, y]];
+                this._points = [[x, y, time]];
             }
             return Clutter.EVENT_PROPAGATE;
         }
@@ -171,7 +173,7 @@ export class SwipeTyper {
             return Clutter.EVENT_PROPAGATE;
         }
 
-        this._points.push([x, y]);
+        this._points.push([x, y, time]);
         if (type === T.TOUCH_UPDATE) {
             if (!this._swiping)
                 this._maybeStart(x, y);
@@ -256,7 +258,8 @@ export class SwipeTyper {
             const [bw, bh] = b.get_transformed_size();
             keys[b.get_label().toLowerCase()] = [(bx + bw / 2) / unit, (by + bh / 2) / unit];
         }
-        const path = points.map(([px, py]) => [px / unit, py / unit]);
+        const t0 = points[0][2];
+        const path = points.map(([px, py, t]) => [px / unit, py / unit, t - t0]);
         this._onSwipe(keys, path, shifted);
     }
 }

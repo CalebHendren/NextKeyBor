@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """Swipe words across the keyboard in the test session and check what gets typed.
 
-    tools/nested/swipe_test.py [--layout clip|plain] [--fast] DIR [word ...]
+    tools/nested/swipe_test.py [--layout clip|plain | --grid QX,STEP,Y1,Y2,Y3] [--straight [--fast]] DIR [word ...]
+
+--grid gives the key grid by hand: the centre x of q, the distance between
+key centres, and the centre y of the three letter rows (rows shift by half a
+key, as in the stock layout).
+
+Paths are human-like by default (rounded corners, off-centre aim, overshoot;
+see tools/swipe_bench.py); --straight swipes straight lines through the key
+centres instead.
 
 Needs the session from tools/nested/restart.sh with the keyboard open on the
 letter level and no panel showing. Key centres are for the 1440x960 test
@@ -13,7 +21,9 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from drive import Driver  # noqa: E402
+from swipe_bench import human_path, letter_targets  # noqa: E402
 
 # Key centres per layout: with the clipboard suggestion row showing, or without.
 LAYOUTS = {
@@ -39,16 +49,30 @@ def finger_path(word, rng):
     return pts
 
 
+def human_finger_path(word, rng, unit):
+    """swipe_bench's human-like path, in pixels; points come 1/60 s apart."""
+    keys = {c: (x / unit, y / unit) for c, (x, y) in KEYS.items()}
+    return [(x * unit, y * unit) for x, y, _t in human_path(letter_targets(word, keys), rng)]
+
+
 def main():
     args = sys.argv[1:]
-    layout, speed = "clip", 0.07
+    layout, speed, straight = "clip", 0.07, False
     while args and args[0].startswith("--"):
         opt = args.pop(0)
         if opt == "--layout":
             layout = args.pop(0)
         elif opt == "--fast":
             speed = 0.03
+        elif opt == "--straight":
+            straight = True
+        elif opt == "--grid":
+            qx, step, y1, y2, y3 = (float(v) for v in args.pop(0).split(","))
+            LAYOUTS["grid"] = [("qwertyuiop", qx, step, y1), ("asdfghjkl", qx + step / 2, step, y2),
+                               ("zxcvbnm", qx + step, step, y3)]
+            layout = "grid"
     rows = LAYOUTS[layout]
+    unit = rows[0][2]
     KEYS.update({c: (x0 + i * step, y) for letters, x0, step, y in rows for i, c in enumerate(letters)})
     state = Path(args[0])
     words = args[1:] or WORDS
@@ -58,7 +82,10 @@ def main():
     ok = 0
     for word in words:
         before = text_file.read_text() if text_file.exists() else ""
-        d.swipe(finger_path(word, rng), seg_s=speed)
+        if straight:
+            d.swipe(finger_path(word, rng), seg_s=speed)
+        else:
+            d.swipe(human_finger_path(word, rng, unit), seg_s=1 / 60)
         d.wait(0.6)
         after = text_file.read_text() if text_file.exists() else ""
         typed = after[len(before):] if after.startswith(before) else f"<changed: {after[-30:]!r}>"

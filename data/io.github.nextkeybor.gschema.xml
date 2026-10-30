@@ -50,6 +50,15 @@
       <default>true</default>
       <summary>Insert a space after picking a suggestion</summary>
     </key>
+    <key name="autocorrect" type="b">
+      <default>true</default>
+      <summary>Fix clear typos when a word is finished with a space or punctuation</summary>
+      <description>Backspace right after a correction puts back what you typed, and that word is not corrected again.</description>
+    </key>
+    <key name="text-shortcuts" type="a{ss}">
+      <default>{'omw': 'On my way!'}</default>
+      <summary>Text shortcuts: typing the shortcut and a space types the phrase</summary>
+    </key>
     <key name="double-space-period" type="b">
       <default>true</default>
       <summary>Double-tap the space bar to type a period and a space</summary>
@@ -65,6 +74,19 @@
     <key name="swipe-typing" type="b">
       <default>true</default>
       <summary>Type words by sliding across the letters</summary>
+    </key>
+    <key name="key-popups" type="b">
+      <default>true</default>
+      <summary>Show the character above a key while it is pressed</summary>
+    </key>
+    <key name="space-cursor" type="b">
+      <default>true</default>
+      <summary>Slide along the space bar to move the text cursor</summary>
+    </key>
+    <key name="swipe-log" type="b">
+      <default>false</default>
+      <summary>Keep a local log of swipes and the words they were meant to be</summary>
+      <description>Saved to ~/.local/share/nextkeybor/swipe-log.jsonl and never sent anywhere; used to measure and tune swipe typing.</description>
     </key>
     <key name="floating" type="b">
       <default>false</default>

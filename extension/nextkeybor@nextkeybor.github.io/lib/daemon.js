@@ -128,9 +128,22 @@ export class DaemonClient extends Signals.EventEmitter {
         return words;
     }
 
+    async autocorrect(context, language) {
+        const [replacement] = await this._call('Autocorrect', context, language);
+        return replacement;
+    }
+
+    acceptWord(word) {
+        return this._call('AcceptWord', word);
+    }
+
     async swipeWords(context, language, keys, path, max) {
         const [words] = await this._call('SwipeWords', context, language, keys, path, max);
         return words;
+    }
+
+    logSwipe(entry) {
+        return this._call('LogSwipe', JSON.stringify(entry));
     }
 
     learnText(text, language) {

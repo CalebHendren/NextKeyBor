@@ -185,6 +185,16 @@ export default class NextKeyBorExtension extends Extension {
         };
 
         proto._updateLevelFromHints = function (...args) {
+            // As on Gboard, the ?123 page stays up while typing digits and
+            // symbols, and a space goes back to the letters.
+            const [userInputHappened] = args;
+            const symbols = this._currentPage &&
+                (this._currentPage === this._layers?.['opt'] || this._currentPage === this._layers?.['opt+shift']);
+            if (userInputHappened && symbols && !this._latched) {
+                if (this._nkbLastCommit !== ' ')
+                    return undefined;
+                this._setActiveLevel('default');
+            }
             if (settings.get_boolean('fix-auto-capitalization'))
                 return updateLevelFromHints.apply(this, args);
             return orig._updateLevelFromHints.apply(this, args);
