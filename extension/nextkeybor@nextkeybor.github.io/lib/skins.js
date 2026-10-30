@@ -258,11 +258,13 @@ export function skinCss(loaded) {
     const image = backgroundImageFile(s, loaded.dir);
     const border = s.borderWidth !== null
         ? `${s.borderWidth}px solid ${s.borderColor ?? withAlpha(s.keyText, 0.25)}` : null;
-    const tools = ['.nkb-tool-button', '.nkb-suggestion', '.nkb-category', '.nkb-emoji', '.nkb-row', '.nkb-one-handed-button']
-        .map(c => `#keyboard ${c}`);
+    // The one-handed strip sits beside #keyboard, not in it.
+    const strip = '.nkb-one-handed-strip .nkb-one-handed-button';
+    const tools = [...['.nkb-tool-button', '.nkb-suggestion', '.nkb-category', '.nkb-emoji', '.nkb-row']
+        .map(c => `#keyboard ${c}`), strip];
     const texts = ['.word-suggestions', '.nkb-tool-button', '.nkb-suggestion', '.nkb-toolbar-status', '.nkb-query',
-        '.nkb-status', '.nkb-hint', '.nkb-category', '.nkb-emoji', '.nkb-row', '.nkb-edit-title', '.nkb-edit-key',
-        '.nkb-one-handed-button'].map(c => `#keyboard ${c}`);
+        '.nkb-status', '.nkb-hint', '.nkb-category', '.nkb-emoji', '.nkb-row', '.nkb-edit-title', '.nkb-edit-key']
+        .map(c => `#keyboard ${c}`).concat(strip);
     const faint = ['.nkb-row-subtitle', '.nkb-list-header', '.nkb-query-label.nkb-placeholder', '.nkb-query-icon',
         '.nkb-row-progress'].map(c => `#keyboard ${c}`);
 
@@ -309,7 +311,13 @@ export function skinCss(loaded) {
     css += rule(states(tools, ':active'), {'background-color': withAlpha(s.toolbarText, 0.2)});
     css += rule(states(tools, ':checked'), {'background-color': mix(s.accent, s.background, 0.6)});
     css += rule(['#keyboard .nkb-mic.nkb-recording'], {color: '#ffffff'});
-    css += rule(['#keyboard .nkb-one-handed-button'], {'background-color': withAlpha(s.toolbarText, 0.1)});
+    css += rule([strip], {'background-color': withAlpha(s.toolbarText, 0.1)});
+    // Its background colour is copied from #keyboard (layoutModes.js).
+    css += rule('.nkb-one-handed-strip', {
+        'background-image': image ? `url("${image.get_uri()}")` : null,
+        'background-size': image ? 'cover' : null,
+        'background-position': image ? 'center' : null,
+    });
     css += rule(['#keyboard .nkb-query', '#keyboard .nkb-variant-bar', '#keyboard .nkb-hint'],
         {'background-color': withAlpha(s.toolbarText, 0.08)});
     css += rule(['#keyboard .nkb-edit-key'], {

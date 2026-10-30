@@ -109,9 +109,11 @@ export class OneHandedStrip {
         this._binding = keyboard.bind_property('translation-y', this.actor, 'translation-y',
             GObject.BindingFlags.SYNC_CREATE);
 
+        // style-changed: a skin or theme change.
         keyboard.connectObject(
             'notify::width', () => this.sync(),
-            'notify::height', () => this.sync(), this);
+            'notify::height', () => this.sync(),
+            'style-changed', () => this.sync(), this);
         settings.connectObject(
             'changed::one-handed', () => this.sync(),
             'changed::floating', () => this.sync(), this);
@@ -143,7 +145,8 @@ export class OneHandedStrip {
         // A fixed size: the keyboard expands, and would share any room left.
         const monitor = Main.layoutManager.keyboardMonitor;
         this.actor.set_size(Math.max(0, (monitor?.width ?? 0) - this._kb.width), this._kb.height);
-        // The keyboard's own background, whatever the theme.
+        // The keyboard's own background, whatever the theme or skin (a
+        // skin's background image comes from its stylesheet; see skins.js).
         if (this._kb.get_stage()) {
             const c = this._kb.get_theme_node().get_background_color();
             this.actor.style = `background-color: rgba(${c.red}, ${c.green}, ${c.blue}, ${c.alpha / 255});`;
