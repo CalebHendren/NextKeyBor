@@ -1,13 +1,15 @@
 // Clipboard history: the last few texts copied anywhere, kept in memory only
 // (never on disk) and pasted back from a panel. Pinned items stay when newer
-// copies push the rest out. Copies that password managers mark as secret
-// are skipped.
+// copies push the rest out. The list survives the screen lock (which disables
+// the extension) but not logging out. Copies that a password manager marks
+// as secret (KeePassXC, KDE) are skipped; most others don't mark them.
 
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
 
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Signals from 'resource:///org/gnome/shell/misc/signals.js';
 
 import {Panel} from './panels.js';
@@ -20,12 +22,16 @@ const TEXT_MIME = /^(text\/plain|UTF8_STRING$|STRING$|TEXT$)/;
 // KeePassXC, KDE and others set this on passwords they copy.
 const SECRET_MIME = 'x-kde-passwordManagerHint';
 
+// The items while the screen is locked, for the next ClipboardHistory.
+let lockedItems = [];
+
 // Emits 'changed' when items change.
 export class ClipboardHistory extends Signals.EventEmitter {
     constructor(settings) {
         super();
         this._settings = settings;
-        this.items = []; // [{text, pinned}], newest first
+        this.items = this.enabled ? lockedItems : []; // [{text, pinned}], newest first
+        lockedItems = [];
         global.display.get_selection().connectObject('owner-changed',
             (_s, type, source) => this._onOwnerChanged(type, source), this);
         settings.connectObject('changed::clipboard-history', () => {
@@ -43,6 +49,8 @@ export class ClipboardHistory extends Signals.EventEmitter {
     destroy() {
         global.display.get_selection().disconnectObject(this);
         this._settings.disconnectObject(this);
+        if (Main.sessionMode.isLocked && this.enabled)
+            lockedItems = this.items;
         this.items = [];
     }
 

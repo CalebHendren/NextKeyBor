@@ -108,7 +108,7 @@
     <key name="clipboard-history" type="b">
       <default>true</default>
       <summary>Keep the last texts you copied, in memory only, to paste from the keyboard</summary>
-      <description>Nothing is written to disk; the list is gone when you log out. Passwords that password managers copy are skipped.</description>
+      <description>Nothing is written to disk; the list is gone when you log out. Copies that a password manager marks as secret (KeePassXC, KDE) are skipped, but most password managers and browsers don't mark them.</description>
     </key>
     <key name="floating" type="b">
       <default>false</default>

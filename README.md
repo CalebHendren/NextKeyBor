@@ -22,7 +22,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
 - **Floating keyboard:** switch it on from the keyboard button in the top bar (hold it for the menu) or in settings. The keyboard becomes a panel you drag by its top bar; it opens where you left it, whether you tap a text field or the top bar button, and its X closes it.
 - **Skins:** pick the keyboard's look under Appearance in settings: follow the shell theme, light, dark, high contrast, Nord, Catppuccin Mocha, or your wallpaper's colours through pywal or matugen. Make your own from a copy of any skin (see [Skins](#skins)); saved changes show on the keyboard straight away.
 - **Text editing:** the editing button swaps the keys for a panel with arrows (with Select on, they extend the selection), Home/End, select all, cut, copy, paste, undo, redo and delete. Arrows and delete repeat while held. In a terminal, select all, undo and redo are greyed out, since Ctrl+Z there suspends the running program.
-- **Clipboard history:** the clipboard button lists the last 20 texts you copied; tap one to paste it, hold to pin it. Kept in memory only, never on disk, and passwords copied from password managers are skipped.
+- **Clipboard history:** the clipboard button lists the last 20 texts you copied; tap one to paste it, hold to pin it. Kept in memory only, never on disk. Passwords are skipped when the password manager marks them as secret (KeePassXC and KDE do; most others, and browsers, don't), so turn this off if you copy passwords from one that doesn't.
 - **Screenshots:** the camera button opens GNOME's screenshot tool (area, window or screen; picture or video).
 - **Hold for special characters:** long-press top-row letters for the digits 1–0. Other keys give common symbols, alongside GNOME's accented letters.
 - **Number row:** an optional row of digits above the letters (in settings); hold a digit for fractions and superscripts.
@@ -111,7 +111,7 @@ Everything stays on your machine unless you search for GIFs or stickers, which s
 
 - Learned words, favourites, your own GIF library and the swipe log (only when turned on): `~/.local/share/nextkeybor/`
 - Cache: `~/.cache/nextkeybor/`
-- Clipboard history: in memory only, never written to disk; gone when you log out or turn it off.
+- Clipboard history: in memory only, never written to disk; kept while the screen is locked, gone when you log out or turn it off.
 
 ## Licence
 

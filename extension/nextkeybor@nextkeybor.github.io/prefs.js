@@ -242,7 +242,7 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         holds.add(switchRow(settings, 'swipe-log', 'Log swipes to improve swipe typing',
             'Keeps your swipes and the words you meant in ~/.local/share/nextkeybor; never sent anywhere'));
         holds.add(switchRow(settings, 'clipboard-history', 'Clipboard history',
-            'The last texts you copied, to paste from the keyboard; kept in memory only, never on disk'));
+            'The last texts you copied, to paste from the keyboard; kept in memory only, never on disk. Passwords are skipped only from KeePassXC and KDE'));
         holds.add(switchRow(settings, 'split-landscape', 'Split keyboard in landscape',
             'Two halves at the screen edges, for typing with both thumbs'));
         holds.add(comboRow(settings, 'one-handed', 'One-handed mode',
