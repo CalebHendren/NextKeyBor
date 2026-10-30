@@ -15,6 +15,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
   - a pressed key shows its character above your finger
   - slide along the space bar to move the cursor
   - double-tap shift for caps lock
+  - an optional click sound on each key press (in settings)
   - punctuation after an automatic space takes the space's place ("word ." → "word. ")
   - the ?123 page stays up while you type digits and symbols, and a space takes you back to the letters
 - **Resizable:** drag the handle on top of the keyboard to set its height, separately for landscape and portrait.

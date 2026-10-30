@@ -4,7 +4,9 @@
 //   is held, as on iOS and Gboard (setting key-popups);
 // - space-bar cursor: sliding along the space bar moves the text cursor
 //   instead of typing a space (setting space-cursor);
-// - double-tap shift for caps lock (stock GNOME only latches on long-press).
+// - double-tap shift for caps lock (stock GNOME only latches on long-press);
+// - a click sound on each key press (setting key-sound; played through
+//   GNOME's sound player, so it follows the system's alert sound settings).
 //
 // Like SwipeTyper, this watches touches from keyboardBox's captured-event,
 // so it sees them before the keys do.
@@ -35,8 +37,10 @@ function isShiftKey(key) {
 export class KeyGestures {
     // enabled(): false while a panel replaces the keys and the like.
     // moveCursor(keyval): send one Left/Right; cursorMoved(): the drag ended.
-    constructor(keyboard, {settings, enabled, moveCursor, cursorMoved}) {
+    // soundFile: a Gio.File with the click sound.
+    constructor(keyboard, {settings, enabled, moveCursor, cursorMoved, soundFile = null}) {
         this._kb = keyboard;
+        this._soundFile = soundFile;
         this._settings = settings;
         this._enabled = enabled;
         this._moveCursor = moveCursor;
@@ -62,6 +66,8 @@ export class KeyGestures {
     _onEvent(event) {
         const T = Clutter.EventType;
         const type = event.type();
+        if (type === T.TOUCH_BEGIN || type === T.BUTTON_PRESS)
+            this._maybeClick(event);
         if (type !== T.TOUCH_BEGIN && type !== T.TOUCH_UPDATE &&
             type !== T.TOUCH_END && type !== T.TOUCH_CANCEL)
             return Clutter.EVENT_PROPAGATE;
@@ -104,6 +110,16 @@ export class KeyGestures {
                 this._onRelease(keyOf(global.stage.get_event_actor(event)));
         }
         return Clutter.EVENT_PROPAGATE;
+    }
+
+    // ---- key click ---------------------------------------------------------
+
+    _maybeClick(event) {
+        if (!this._soundFile || !this._settings.get_boolean('key-sound'))
+            return;
+        const key = keyOf(global.stage.get_event_actor(event));
+        if (key && this._kb.contains(key) && this._enabled())
+            global.display.get_sound_player().play_from_file(this._soundFile, 'Key click', null);
     }
 
     // ---- key popups --------------------------------------------------------

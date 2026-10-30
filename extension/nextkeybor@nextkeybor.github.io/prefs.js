@@ -231,6 +231,8 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
             'Slide across the letters to type a word; lift to finish'));
         holds.add(switchRow(settings, 'key-popups', 'Key popups',
             'Show the character above a key while you press it'));
+        holds.add(switchRow(settings, 'key-sound', 'Key click sound',
+            'A click on each key press; silent when alert sounds are off in Settings \u2192 Sound'));
         holds.add(switchRow(settings, 'space-cursor', 'Move the cursor with the space bar',
             'Slide along the space bar to move the text cursor'));
         holds.add(switchRow(settings, 'swipe-log', 'Log swipes to improve swipe typing',

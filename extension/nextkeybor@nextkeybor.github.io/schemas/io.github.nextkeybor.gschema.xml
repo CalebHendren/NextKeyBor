@@ -91,6 +91,11 @@
       <default>true</default>
       <summary>Slide along the space bar to move the text cursor</summary>
     </key>
+    <key name="key-sound" type="b">
+      <default>false</default>
+      <summary>Play a click on each key press</summary>
+      <description>Uses GNOME's sound player, so it is silent when alert sounds are off in Settings → Sound.</description>
+    </key>
     <key name="swipe-log" type="b">
       <default>false</default>
       <summary>Keep a local log of swipes and the words they were meant to be</summary>

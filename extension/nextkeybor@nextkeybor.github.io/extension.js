@@ -241,6 +241,7 @@ export default class NextKeyBorExtension extends Extension {
                 daemon: this._daemon,
                 clipboard: this._clipboard,
                 floating: this._floating,
+                soundFile: this.dir.get_child('sounds').get_child('key-click.wav'),
                 openPreferences: () => {
                     kb.close(true);
                     this.openPreferences();

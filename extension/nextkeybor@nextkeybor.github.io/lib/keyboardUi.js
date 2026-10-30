@@ -72,7 +72,7 @@ function loadBytes(path) {
 }
 
 export class KeyboardUi {
-    constructor(keyboard, {settings, daemon, clipboard, openPreferences, floating = null}) {
+    constructor(keyboard, {settings, daemon, clipboard, openPreferences, floating = null, soundFile = null}) {
         this._kb = keyboard;
         this._settings = settings;
         this._daemon = daemon;
@@ -127,6 +127,7 @@ export class KeyboardUi {
                 this._pressKeys([keyval]);
             },
             cursorMoved: () => this._resetText(),
+            soundFile,
         });
 
         Main.inputMethod.connectObject('surrounding-text-set', () => {
