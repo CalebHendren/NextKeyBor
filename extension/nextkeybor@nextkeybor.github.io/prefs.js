@@ -163,6 +163,11 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         statusGroup.add(kbRow);
         general.add(statusGroup);
 
+        const topBar = new Adw.PreferencesGroup({title: 'Top bar'});
+        topBar.add(switchRow(settings, 'show-indicator', 'Show icon in the top bar',
+            'Tap it to show or hide the keyboard; hold for more. Off hides the icon.'));
+        general.add(topBar);
+
         // Filled in with the GroqType section on the Dictation page.
         let syncGroq = () => {};
         const updateStatus = async () => {
@@ -252,8 +257,6 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         holds.add(switchRow(settings, 'floating', 'Floating keyboard',
             'A panel you drag by its top bar; it opens where you left it'));
         holds.add(spinRow(settings, 'float-width', 'Floating width', 30, 100, 'Percent of the screen width'));
-        holds.add(switchRow(settings, 'show-indicator', 'Keyboard button in the top bar',
-            'Tap to show or hide the keyboard; hold for more'));
         holds.add(spinRow(settings, 'height-landscape', 'Height in landscape', 15, 60,
             'Percent of the screen; you can also drag the handle on top of the keyboard'));
         holds.add(spinRow(settings, 'height-portrait', 'Height in portrait', 15, 60,
