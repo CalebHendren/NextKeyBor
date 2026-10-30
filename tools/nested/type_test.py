@@ -4,10 +4,13 @@
     tools/nested/type_test.py [--layout clip|plain | --grid QX,STEP,Y1,Y2,Y3] DIR
 
 Checks, on the stock US layout:
+  "adn" + space, fast  -> "and "  (corrected, with no pause before the space)
+  "thx" + space        -> "thx "  (an abbreviation, left alone)
   "teh" + space        -> "the "  (corrected)
   then Backspace       -> "teh"   (put back as typed, and accepted)
   then space           -> "teh "  (not corrected again)
   "teh" + space again  -> "teh "  (still not corrected)
+  "adn" + space + "."  -> "and. " (the period replaces the space after a correction)
 
 Needs a fresh session from tools/nested/restart.sh with the keyboard open on
 the letter level and no panel showing (after the undo, the keyboard leaves
@@ -34,12 +37,14 @@ def key_positions(rows):
     """Letter centres, plus Backspace and the space bar, from the letter rows.
 
     The stock top row ends with a 1.5-key Backspace; NextKeyBor centres the
-    space bar on the 11.5-key-wide keyboard, one row below the letters.
+    space bar on the 11.5-key-wide keyboard, one row below the letters. The
+    bottom letter row goes on with a comma and a period.
     """
     keys = {c: (x0 + i * step, y) for letters, x0, step, y in rows for i, c in enumerate(letters)}
     (_, qx, step, y1), (_, _, _, y2), (_, _, _, y3) = rows
     keys["\b"] = (qx + 10.25 * step, y1)
     keys[" "] = (qx + 5.25 * step, y3 + (y3 - y2))
+    keys["."] = (qx + 9 * step, y3)  # after m and the comma
     return keys
 
 
@@ -81,10 +86,14 @@ def main():
     start = text()
     ok = 0
     checks = [
-        ("teh + space", lambda: (tap("teh"), d.wait(TYPING_S), tap(" ")), "the "),
-        ("Backspace", lambda: tap("\b"), "teh"),
-        ("space", lambda: tap(" "), "teh "),
-        ("teh + space again", lambda: (tap("teh"), d.wait(TYPING_S), tap(" ")), "teh teh "),
+        ("adn + space, fast", lambda: tap("adn "), "and "),
+        ("thx + space", lambda: (tap("thx"), d.wait(TYPING_S), tap(" ")), "and thx "),
+        ("teh + space", lambda: (tap("teh"), d.wait(TYPING_S), tap(" ")), "and thx the "),
+        ("Backspace", lambda: tap("\b"), "and thx teh"),
+        ("space", lambda: tap(" "), "and thx teh "),
+        ("teh + space again", lambda: (tap("teh"), d.wait(TYPING_S), tap(" ")), "and thx teh teh "),
+        ("adn + space + .", lambda: (tap("adn"), d.wait(TYPING_S), tap(" "), d.wait(TYPING_S), tap(".")),
+         "and thx teh teh and. "),
     ]
     for name, act, want in checks:
         act()
