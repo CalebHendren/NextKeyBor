@@ -131,8 +131,9 @@ export class KeyGestures {
 
         // A finger sliding off its key is swiping, not pressing.
         if (type === T.TOUCH_UPDATE && slot === this._popupSlot) {
-            const [cx, width] = this._popupStart;
-            if (Math.abs(event.get_coords()[0] - cx) > width)
+            const [cx, cy, width, height] = this._popupStart;
+            const [x, y] = event.get_coords();
+            if (Math.abs(x - cx) > width || Math.abs(y - cy) > height)
                 this.hidePopup();
         }
         if (type === T.TOUCH_END || type === T.TOUCH_CANCEL) {
@@ -177,7 +178,7 @@ export class KeyGestures {
         this._popup.set_position(x, Math.max(0, Math.round(ky + kh * 0.4 - height)));
         Main.layoutManager.uiGroup.add_child(this._popup);
         this._popupSlot = slot;
-        this._popupStart = [kx + kw / 2, kw];
+        this._popupStart = [kx + kw / 2, ky + kh / 2, kw, kh];
         // The long-press popup (extra characters) takes over from ours.
         this._popupKey = key;
         key.connectObject('long-press', () => this.hidePopup(), this);
@@ -264,6 +265,12 @@ export class KeyGestures {
         if (!key || !isShiftKey(key))
             return;
         const now = GLib.get_monotonic_time() / 1000;
+        // This runs before the key sees the tap. A tap that leaves caps lock
+        // doesn't start a double tap, or tapping twice could never leave it.
+        if (this._kb._latched) {
+            this._lastShiftTap = 0;
+            return;
+        }
         const second = now - this._lastShiftTap < DOUBLE_TAP_MS;
         this._lastShiftTap = second ? 0 : now;
         if (!second)
