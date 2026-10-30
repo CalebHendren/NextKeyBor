@@ -416,7 +416,7 @@ export class KeyboardUi {
         }
         this._micButton.visible = !password;
         this._closeButton.visible = !!this._floating?.enabled;
-        // Openverse (used until a GIPHY/KLIPY/Tenor key is set) has no stickers.
+        // Openverse (used until a GIPHY/KLIPY key is set) has no stickers.
         const provider = this._settings.get_string('gif-provider');
         this._stickerButton.visible = provider !== 'openverse' &&
             this._settings.get_string(`${provider}-api-key`).length > 0;

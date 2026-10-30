@@ -313,12 +313,11 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         window.add(gifs);
         const prov = new Adw.PreferencesGroup({
             title: 'Online GIFs and stickers',
-            description: 'Openverse works without a key but has few reaction GIFs. For GIPHY or KLIPY, use Get a key to sign up and create one; until a key is set, searches use Openverse. Google shut down the Tenor API on June 30, 2026, so Tenor keys no longer work. Favourites and your own GIFs work offline.',
+            description: 'Openverse works without a key but has few reaction GIFs. For GIPHY or KLIPY, use Get a key to sign up and create one; until a key is set, searches use Openverse. Favourites and your own GIFs work offline.',
         });
         prov.add(comboRow(settings, 'gif-provider', 'Provider', PROVIDERS));
         prov.add(addLink(entryRow(settings, 'giphy-api-key', 'GIPHY API key', true), 'Get a key', GIPHY_KEY_URL));
         prov.add(addLink(entryRow(settings, 'klipy-api-key', 'KLIPY API key', true), 'Get a key', KLIPY_KEY_URL));
-        prov.add(entryRow(settings, 'tenor-api-key', 'Tenor API key (discontinued)', true));
         prov.add(comboRow(settings, 'gif-content-rating', 'Content rating', RATINGS));
         prov.add(spinRow(settings, 'gif-cache-mb', 'Cache size (MB)', 20, 5000));
         gifs.add(prov);

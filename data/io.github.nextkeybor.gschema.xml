@@ -144,7 +144,6 @@
     <key name="gif-provider" type="s">
       <choices>
         <choice value='giphy'/>
-        <choice value='tenor'/>
         <choice value='klipy'/>
         <choice value='openverse'/>
       </choices>
