@@ -31,7 +31,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
   - favourite items (saved locally, so they work offline)
   - import your own GIFs through the system file picker
   - search your favourites and your own GIFs too.
-- **Physical keyboard detection:** the on-screen keyboard switches on when no real keyboard can be used, and off again when one can. This covers a Type Cover folded back into tablet mode, a Bluetooth or USB keyboard being connected, and typing on a physical keyboard. It is off by default; it needs read access to `/dev/input` (`sudo usermod -aG input $USER`), and without it the daemon never switches the keyboard on.
+- **Physical keyboard detection:** the on-screen keyboard switches on when no real keyboard can be used, and off again when one can. This covers a Type Cover folded back into tablet mode, a Bluetooth or USB keyboard being connected, and typing on a physical keyboard. It is off by default (earlier builds had it on; turn "Automatic on-screen keyboard" back on in settings if you relied on it); it needs read access to `/dev/input` (`sudo usermod -aG input $USER`), and without it the daemon never switches the keyboard on.
 - **Fixes for GNOME's keyboard:**
   - The keyboard now opens when you tap text fields in Chromium, Electron and Qt apps. Mutter only opens it for apps that re-enable text input on each tap, which those apps don't do.
   - Shift no longer switches on by itself after every backspace in terminals and Chromium apps.

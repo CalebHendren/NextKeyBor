@@ -1,7 +1,7 @@
 {
   "uuid": "nextkeybor@nextkeybor.github.io",
   "name": "NextKeyBor",
-  "description": "Supercharges the GNOME on-screen keyboard: dictation button with language selection (local whisper.cpp), word completion, hold-for-numbers and symbols, emoji and symbol search, a searchable GIF and sticker library with favourites and your own uploads. Also fixes the OSK not opening in Chromium/Electron/Qt apps and Shift latching after backspace. Needs the nextkeybord daemon.",
+  "description": "Supercharges the GNOME on-screen keyboard: swipe typing, autocorrect and word completion, dictation with language selection (local whisper.cpp), hold-for-numbers and symbols, a number row, emoji search and suggestions, clipboard history, a text-editing panel, a searchable GIF and sticker library with favourites and your own uploads, split and one-handed layouts, and skins. Also fixes the OSK not opening in Chromium/Electron/Qt apps and Shift latching after backspace. Needs the nextkeybord daemon.",
   "shell-version": ["50"],
   "settings-schema": "io.github.nextkeybor",
   "url": "https://github.com/dixonSolutions/NextKeyBor",

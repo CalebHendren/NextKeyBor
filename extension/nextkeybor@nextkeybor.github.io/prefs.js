@@ -79,7 +79,8 @@ function shortcutsGroup(settings) {
             rows.push(row);
         }
     };
-    settings.connect('changed::text-shortcuts', sync);
+    const changedId = settings.connect('changed::text-shortcuts', sync);
+    group.connect('destroy', () => settings.disconnect(changedId));
     sync();
     return group;
 }
