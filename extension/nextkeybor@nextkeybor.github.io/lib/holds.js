@@ -55,6 +55,17 @@ export function augmentRow(keys, rowIndex, levelMode) {
     }
 }
 
+// The stock URL layout's "www." key: a tap types ".com", the long-press popup
+// offers other common endings, and keeps "www.".
+const URL_ENDINGS = ['.com', '.org', '.net', '.io', '.dev', 'www.'];
+
+export function replaceWwwKey(keys) {
+    for (const key of keys) {
+        if (!key.action && key.strings?.length === 1 && key.strings[0] === 'www.')
+            key.strings = [...URL_ENDINGS];
+    }
+}
+
 // Widen the space bar and centre it: the stock letter rows put it left of
 // centre (the hide key is wider than ?123). Keys sit on a half-key grid, so
 // the outermost key on each side gets 1.5 and the others 1.

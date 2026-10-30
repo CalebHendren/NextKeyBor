@@ -7,7 +7,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {DaemonClient} from './lib/daemon.js';
 import {Floating, KeyboardIndicator} from './lib/floating.js';
 import {TapFix, updateLevelFromHints} from './lib/fixes.js';
-import {augmentRow, centreSpaceBar} from './lib/holds.js';
+import {augmentRow, centreSpaceBar, replaceWwwKey} from './lib/holds.js';
 import {KeyboardUi, MAX_HEIGHT_RATIO} from './lib/keyboardUi.js';
 
 // Earlier single-purpose fixes that NextKeyBor includes; running both would
@@ -173,6 +173,11 @@ export default class NextKeyBorExtension extends Extension {
                 centreSpaceBar(keys);
             } catch (e) {
                 console.error(`NextKeyBor: space bar layout failed: ${e}`);
+            }
+            try {
+                replaceWwwKey(keys);
+            } catch (e) {
+                console.error(`NextKeyBor: www. key replacement failed: ${e}`);
             }
             if (settings.get_boolean('hold-for-numbers')) {
                 try {
