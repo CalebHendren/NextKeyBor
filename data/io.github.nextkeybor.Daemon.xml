@@ -146,6 +146,12 @@
       <arg direction="in" type="u" name="max"/>
       <arg direction="out" type="s" name="results_json"/>
     </method>
+    <method name="EmojiForWord">
+      <!-- The emoji to offer after a finished word: one named after it ("pizza" -> 🍕), else the
+           most used or popular one tagged with it. "" when there is none. -->
+      <arg direction="in" type="s" name="word"/>
+      <arg direction="out" type="s" name="emoji"/>
+    </method>
     <method name="NoteEmojiUsed">
       <arg direction="in" type="s" name="emoji"/>
     </method>

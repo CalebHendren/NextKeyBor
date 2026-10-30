@@ -33,6 +33,8 @@ const DOUBLE_SPACE_MS = 1000;
 const BOUNCE_MARGIN_MS = 30;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
+// The word just finished with a space, for emoji suggestions.
+const FINISHED_WORD = /([\p{L}'’-]+) $/u;
 // A word finished with one of these is autocorrected.
 const AUTOCORRECT_TRIGGER = /^[ .,!?;:]$/;
 // Typed right after an automatic space, these take its place: "word. ".
@@ -863,9 +865,10 @@ export class KeyboardUi {
         this._sendKeyLayout();
         const context = this._context();
         const partial = lastWord(context);
-        const [words, fix] = await Promise.all([
+        const [words, fix, emoji] = await Promise.all([
             this._daemon.suggest(context, '', MAX_SUGGESTIONS),
             this._fetchAutocorrect(context, partial),
+            this._fetchEmoji(context),
         ]);
         if (this._destroyed || serial !== this._suggestSerial)
             return;
@@ -886,6 +889,33 @@ export class KeyboardUi {
             this._addSuggestionButton(label, ac && i === 0 ? null : label, i === 0 && bold,
                 () => this._applySuggestion(label));
         });
+        if (emoji)
+            this._addEmojiSuggestion(emoji);
+    }
+
+    // An emoji for the word just finished ("pizza " -> 🍕), or ''.
+    _fetchEmoji(context) {
+        const word = context.match(FINISHED_WORD)?.[1];
+        if (!word || !this._settings.get_boolean('emoji-suggestions') || !this._autocorrectAllowed())
+            return Promise.resolve('');
+        return this._daemon.emojiForWord(word).catch(() => '');
+    }
+
+    // Typed after the word and its space, like any emoji, then a space.
+    _addEmojiSuggestion(emoji) {
+        const button = new St.Button({
+            style_class: 'nkb-suggestion nkb-suggestion-emoji',
+            label: emoji,
+            can_focus: false,
+        });
+        connectTap(button, {
+            onTap: () => {
+                this._commitToApp(`${emoji} `);
+                this._autoSpace = true;
+                this._daemon.noteEmojiUsed(emoji).catch(() => {});
+            },
+        });
+        this._suggestionBox.add_child(button);
     }
 
     // Corrections favour slips onto neighbouring keys: tell the daemon where

@@ -59,6 +59,10 @@
       <default>{'omw': 'On my way!'}</default>
       <summary>Text shortcuts: typing the shortcut and a space types the phrase</summary>
     </key>
+    <key name="emoji-suggestions" type="b">
+      <default>true</default>
+      <summary>Offer an emoji for the word just typed in the suggestion bar</summary>
+    </key>
     <key name="double-space-period" type="b">
       <default>true</default>
       <summary>Double-tap the space bar to type a period and a space</summary>

@@ -8,6 +8,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
 - **🌐 Languages:** switch the dictation language and your system keyboard layouts. It can also download spell-check dictionaries and language packs through PackageKit, the same system that GNOME Software uses.
 - **Autocomplete:** word completion, typo fixes and next-word prediction. It learns the words you type and keeps them only on your machine.
 - **Autocorrect:** clear typos are fixed when you finish the word with a space or punctuation ("teh" → "the", "dont" → "don't"). The fix shows in bold in the suggestion bar first. Backspace right after puts back what you typed, and that word is never corrected again. Passwords, terminals, web and email addresses are left alone.
+- **Emoji suggestions:** after a word with an emoji of its own, the suggestion bar offers it ("pizza" → 🍕, "thanks" → 🙏); tap to type it.
 - **Text shortcuts:** type a shortcut and a space to type its phrase ("omw" → "On my way!"). Edit them in settings.
 - **Swipe typing:** slide across the letters and lift; a fading trail follows your finger. The best match is typed, the other matches wait in the suggestion bar, and backspace right after removes the whole word. Matching copes with how real fingers swipe: rounded corners, aiming off-centre, overshooting the last letter.
 - **Phone-keyboard touches:**
@@ -40,11 +41,13 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
 
 ## Install
 
-Requires GNOME Shell 50, CMake, Ninja, a C++20 compiler, GLib and libcurl development headers, and PipeWire (`pw-record`). whisper.cpp and nlohmann/json are downloaded automatically when you build.
+Requires GNOME Shell 50, CMake, Ninja, a C++20 compiler, GLib and libcurl development headers, PipeWire (`pw-record`) and the Unicode CLDR emoji annotations (for emoji search and suggestions). whisper.cpp and nlohmann/json are downloaded automatically when you build.
 
 ```sh
 # Fedora
-sudo dnf install cmake ninja-build gcc-c++ glib2-devel libcurl-devel pipewire-utils
+sudo dnf install cmake ninja-build gcc-c++ glib2-devel libcurl-devel pipewire-utils cldr-emoji-annotation
+# Debian / Ubuntu
+sudo apt install cmake ninja-build g++ libglib2.0-dev libcurl4-openssl-dev pipewire-bin unicode-cldr-core
 ./install.sh            # builds and installs for your user only, no root needed
 ```
 

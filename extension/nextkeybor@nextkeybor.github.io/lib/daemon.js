@@ -178,6 +178,11 @@ export class DaemonClient extends Signals.EventEmitter {
         return parseJson(json, []);
     }
 
+    async emojiForWord(word) {
+        const [emoji] = await this._call('EmojiForWord', word);
+        return emoji;
+    }
+
     noteEmojiUsed(emoji) {
         return this._call('NoteEmojiUsed', emoji);
     }

@@ -13,7 +13,12 @@ namespace nkb::emoji {
 
 namespace {
 
-constexpr const char *kCldr = "/usr/share/unicode/cldr/common";
+// Fedora's cldr-emoji-annotation, Debian/Ubuntu's unicode-cldr-core;
+// NKB_CLDR_DIR overrides it (for testing).
+const char *cldr_dir() {
+    const char *dir = g_getenv("NKB_CLDR_DIR");
+    return dir && *dir ? dir : "/usr/share/unicode/cldr/common";
+}
 constexpr size_t kMaxRecent = 48;
 
 struct Emoji {
@@ -139,7 +144,7 @@ void ensure_lang(const std::string &lang) {
         return;
     g_db.langs.insert(lang);
     for (const char *sub : {"annotations", "annotationsDerived"})
-        load_file(join_path(join_path(kCldr, sub), lang + ".xml"), sub[11] == 'D');
+        load_file(join_path(join_path(cldr_dir(), sub), lang + ".xml"), sub[11] == 'D');
 }
 
 void ensure_loaded() {
@@ -218,6 +223,42 @@ std::string search(const std::string &query, unsigned max) {
     return out.dump();
 }
 
+// The emoji for a finished word, for the suggestion bar: one named after it
+// ("pizza"), else the most used or most popular one tagged with it
+// ("happy"), trying the singular too ("dogs"). Empty when there is none.
+std::string for_word(const std::string &word) {
+    if (g_utf8_strlen(word.c_str(), -1) < 3)
+        return "";
+    ensure_loaded();
+    std::string key = fold(word);
+    std::vector<std::string> keys{key};
+    if (key.size() > 3 && key.back() == 's')
+        keys.push_back(key.substr(0, key.size() - 1));
+    for (const auto &k : keys) {
+        for (const auto &e : g_db.emojis)
+            if (e.name_folded == k)
+                return e.emoji;
+        const Emoji *best = nullptr;
+        long best_rank = 0;
+        for (const auto &e : g_db.emojis) {
+            if (std::find(e.keywords.begin(), e.keywords.end(), k) == e.keywords.end())
+                continue;
+            // Recent first, then popular, then CLDR order.
+            auto recent = std::find(g_recent.begin(), g_recent.end(), e.emoji);
+            long rank = recent != g_recent.end() ? recent - g_recent.begin()
+                        : popular_rank(e.emoji) >= 0 ? 1000 + popular_rank(e.emoji)
+                                                     : 100000 + e.order;
+            if (!best || rank < best_rank) {
+                best = &e;
+                best_rank = rank;
+            }
+        }
+        if (best)
+            return best->emoji;
+    }
+    return "";
+}
+
 void note_used(const std::string &emoji) {
     ensure_loaded();
     g_recent.erase(std::remove(g_recent.begin(), g_recent.end(), emoji), g_recent.end());
@@ -286,6 +327,11 @@ void init() {
         g_variant_get(params, "(&s)", &e);
         note_used(e);
         reply_empty(inv);
+    });
+    svc.on("EmojiForWord", [](GVariant *params, GDBusMethodInvocation *inv) {
+        const gchar *word;
+        g_variant_get(params, "(&s)", &word);
+        reply_string(inv, for_word(word));
     });
     svc.on("SearchSymbols", [](GVariant *params, GDBusMethodInvocation *inv) {
         const gchar *q;

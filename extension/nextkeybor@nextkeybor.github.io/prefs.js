@@ -215,6 +215,8 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         sugg.add(switchRow(settings, 'autocorrect', 'Autocorrect',
             'Fix clear typos when you finish a word; Backspace right after puts back what you typed'));
         sugg.add(switchRow(settings, 'auto-space', 'Add a space after a suggestion'));
+        sugg.add(switchRow(settings, 'emoji-suggestions', 'Emoji suggestions',
+            'Offer an emoji for the word you just typed ("pizza" → 🍕)'));
         sugg.add(switchRow(settings, 'double-space-period', 'Double-tap space for a period'));
         sugg.add(switchRow(settings, 'learn-words', 'Learn new words', 'Stored only on this computer; never in password fields'));
         sugg.add(entryRow(settings, 'active-language', 'Dictionary language (e.g. en_US, pl_PL)'));
