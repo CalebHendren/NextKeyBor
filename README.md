@@ -99,4 +99,4 @@ tools/nested/drive.py /tmp/nkb 'tap 700 450; wait 1; shot /tmp/k.png'
 
 With `mutter-devkit` installed (`sudo dnf install mutter-devkit`) the session also opens as a window you can use yourself; without it, `tools/nested/view.py /tmp/nkb` shows it live (view only).
 
-More in `tools/nested/`: `swipe_test.py` swipes words with human-like finger paths (or `--straight` lines) and checks what gets typed (`--grid` gives the key positions if your keyboard size differs); `NKB_EXTENSIONS="['nextkeybor@nextkeybor.github.io']" tools/nested/restart.sh` limits the session to chosen extensions.
+More in `tools/nested/`: `type_test.py` taps out "teh" and checks autocorrect and its undo; `swipe_test.py` swipes words with human-like finger paths (or `--straight` lines) and checks what gets typed (`--grid` gives the key positions if your keyboard size differs); `NKB_EXTENSIONS="['nextkeybor@nextkeybor.github.io']" tools/nested/restart.sh` limits the session to chosen extensions.
