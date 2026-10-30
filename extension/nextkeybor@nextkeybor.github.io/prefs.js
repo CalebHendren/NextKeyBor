@@ -241,6 +241,9 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
             'The last texts you copied, to paste from the keyboard; kept in memory only, never on disk'));
         holds.add(switchRow(settings, 'split-landscape', 'Split keyboard in landscape',
             'Two halves at the screen edges, for typing with both thumbs'));
+        holds.add(comboRow(settings, 'one-handed', 'One-handed mode',
+            [['off', 'Off'], ['left', 'Left'], ['right', 'Right']],
+            'A narrower keyboard on one side; also from holding the settings button on the keyboard'));
         holds.add(switchRow(settings, 'floating', 'Floating keyboard',
             'A panel you drag by its top bar; it opens where you left it'));
         holds.add(spinRow(settings, 'float-width', 'Floating width', 30, 100, 'Percent of the screen width'));

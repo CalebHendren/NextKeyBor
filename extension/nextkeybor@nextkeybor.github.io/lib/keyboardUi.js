@@ -15,7 +15,8 @@ import {waitForSignal} from './daemon.js';
 import {EditPanel} from './editPanel.js';
 import {EmojiPanel, LanguagePanel, MediaPanel} from './panels.js';
 import {KeyGestures} from './gestures.js';
-import {splitGap} from './layoutModes.js';
+import {LayoutPanel} from './layoutPanel.js';
+import {OneHandedStrip, oneHandedWidth, splitGap} from './layoutModes.js';
 import {SwipeTyper, letterKeyCentres} from './swipe.js';
 import {connectTap, iconButton, labelButton, setChecked} from './widgets.js';
 
@@ -114,6 +115,8 @@ export class KeyboardUi {
         this._buildPanelHost();
         this._hookController();
 
+        this._oneHanded = new OneHandedStrip(keyboard, settings, floating);
+
         this._swipe = new SwipeTyper(keyboard, {
             enabled: () => this._settings.get_boolean('swipe-typing') && !this._panel &&
                 this._daemon.available && !this._isPassword(),
@@ -179,7 +182,9 @@ export class KeyboardUi {
         settings.connectObject('changed', (_s, key) => {
             if (key === 'speech-language')
                 this._syncMicLabel();
-            if (key === 'floating')
+            if (key === 'one-handed')
+                this._kb._relayout();
+            if (key === 'floating' || key === 'one-handed')
                 this._queueSplitCheck();
             if (key === 'gif-provider' || key.endsWith('-api-key') || key === 'floating' ||
                 key === 'clipboard-history')
@@ -220,6 +225,7 @@ export class KeyboardUi {
 
         this._swipe.destroy();
         this._gestures.destroy();
+        this._oneHanded.destroy();
 
         const kb = this._kb;
         const alive = !kb._nkbDestroyed;
@@ -263,13 +269,18 @@ export class KeyboardUi {
     }
 
     // Rebuild the keys when the split gap they were built with no longer
-    // fits (first allocation, height or orientation changed).
+    // fits (first allocation, height or orientation changed), and fit a
+    // one-handed keyboard to its keys.
     _checkSplit() {
         const kb = this._kb;
         const keys = kb?._aspectContainer;
         if (!keys?.visible || !keys.height)
             return;
         kb._nkbKeysHeight = keys.height;
+        const monitor = Main.layoutManager.keyboardMonitor;
+        const oneWidth = oneHandedWidth(kb, monitor, this._settings, this._floating);
+        if (oneWidth && Math.abs(oneWidth - kb.width) > 1)
+            kb._relayout();
         // Measured on the letters (the level with the number row, if any).
         const want = splitGap(kb, this._settings, this._floating, kb._nkbSplitWidth ?? 0,
             this._settings.get_boolean('number-row'));
@@ -446,9 +457,11 @@ export class KeyboardUi {
             accessibleName: 'Stickers',
             onTap: () => this.togglePanel('sticker'),
         });
+        // Hold for the keyboard shapes (one-handed, split, floating).
         this._settingsButton = iconButton('emblem-system-symbolic', {
             accessibleName: 'NextKeyBor settings',
             onTap: () => this._openPreferences(),
+            onLongPress: () => this.togglePanel('layout'),
         });
         // Floating only: docked, the keyboard's own hide key does this.
         this._closeButton = iconButton('window-close-symbolic', {
@@ -546,6 +559,8 @@ export class KeyboardUi {
             panel = new ClipboardPanel(this._clipboard, {paste: text => this._commitToApp(text)});
         } else if (name === 'edit') {
             panel = new EditPanel({edit: (action, select) => this._editText(action, select)});
+        } else if (name === 'layout') {
+            panel = new LayoutPanel(this._settings);
         } else {
             return;
         }
@@ -563,6 +578,7 @@ export class KeyboardUi {
         setChecked(this._langButton, name === 'language');
         setChecked(this._clipboardButton, name === 'clipboard');
         setChecked(this._editButton, name === 'edit');
+        setChecked(this._settingsButton, name === 'layout');
         this._syncVisibility();
         this._syncStockSuggestions?.();
         this._layoutPanel();
@@ -579,7 +595,7 @@ export class KeyboardUi {
         panel.destroy();
         this._panelHost.hide();
         this._syncStockSuggestions?.();
-        for (const b of [this._gifButton, this._stickerButton, this._langButton, this._clipboardButton, this._editButton])
+        for (const b of [this._gifButton, this._stickerButton, this._langButton, this._clipboardButton, this._editButton, this._settingsButton])
             setChecked(b, false);
         this._kb._aspectContainer?.show();
         this._setExtraHeight(0);

@@ -199,3 +199,10 @@
   border-radius: 18px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 }
+
+/* One-handed mode and the layout menu (lib/layoutModes.js, lib/layoutPanel.js) */
+.nkb-one-handed-buttons { spacing: 16px; }
+.nkb-one-handed-button { padding: 12px; border-radius: 99px; background-color: rgba(255, 255, 255, 0.1); }
+.nkb-one-handed-button StIcon { icon-size: 24px; }
+.nkb-layout-choices { spacing: 6px; padding: 4px; }
+.nkb-layout-panel .nkb-edit-key { min-width: 64px; }

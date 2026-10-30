@@ -12,7 +12,7 @@ import {Floating, KeyboardIndicator} from './lib/floating.js';
 import {TapFix, closeKeyPopups, updateLevelFromHints} from './lib/fixes.js';
 import {SPLIT_AT, augmentRow, centreSpaceBar, numberRowFor, replaceWwwKey, rowWidth, splitRow} from './lib/holds.js';
 import {KeyboardUi, MAX_HEIGHT_RATIO} from './lib/keyboardUi.js';
-import {splitGap} from './lib/layoutModes.js';
+import {oneHandedWidth, splitGap} from './lib/layoutModes.js';
 
 // Earlier single-purpose fixes that NextKeyBor includes; running both would
 // open the keyboard twice.
@@ -146,9 +146,11 @@ export default class NextKeyBorExtension extends Extension {
             if (!monitor)
                 return;
             // Floating: narrower than the monitor (see lib/floating.js).
-            const floatWidth = ext._floating?.width(monitor);
-            if (floatWidth)
-                this.width = floatWidth;
+            // One-handed: narrower, beside its strip (see lib/layoutModes.js).
+            const width = ext._floating?.width(monitor) ??
+                oneHandedWidth(this, monitor, settings, ext._floating);
+            if (width)
+                this.width = width;
             const maxHeight = monitor.height * MAX_HEIGHT_RATIO;
             const key = monitor.width > monitor.height ? 'height-landscape' : 'height-portrait';
             const base = Math.clamp(monitor.height * settings.get_int(key) / 100, minHeight, maxHeight);
