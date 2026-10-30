@@ -630,9 +630,9 @@ std::vector<std::string> Model::suggest(const std::string &context, unsigned max
 // rounding corners, aiming off-centre, starting early and overshooting.
 
 constexpr double kSwipeStep = 0.15;         // resampling step, in keys
-constexpr size_t kSwipeMaxPoints = 64;
+constexpr size_t kSwipeMaxPoints = 48;
 constexpr size_t kSwipeKeep = 12;           // best words kept for the final list
-constexpr double kSwipeLetterSigma = 0.4;   // how far a letter may be from where the finger passed
+constexpr double kSwipeLetterSigma = 0.35;   // how far a letter may be from where the finger passed
 constexpr double kSwipeLineSigma = 0.4;     // how far the path may stray from the line between letters
 constexpr double kSwipeEndReach = 1.6;      // first/last letter within this of the path's ends
 constexpr double kSwipeLetterReach = 1.5;   // every letter within this of the path
@@ -640,7 +640,7 @@ constexpr double kSwipeEndArc = 0.8;        // "the path's ends": this much path
 constexpr double kSwipeFreqWeight = 0.8;    // log word frequency against the path cost
 constexpr double kSwipeNamePenalty = 2.0;   // capitalised words and acronyms the user never typed
 constexpr double kSwipeEndScale = 3.0;      // path before the first letter or after the last costs more
-constexpr double kSwipeTurnBonus = 1.0;     // letters tend to sit where the path turns or slows
+constexpr double kSwipeTurnBonus = 2.0;     // letters tend to sit where the path turns or slows
 
 // Squared distance from p to the segment ab.
 double seg_dist2(Point p, Point a, Point b) {
