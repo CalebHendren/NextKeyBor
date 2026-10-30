@@ -103,7 +103,7 @@ tools/swipe_bench.py > /tmp/swipes.jsonl         # 500 human-like swipes of comm
 nextkeybord --swipe-bench /tmp/swipes.jsonl      # top-1 / top-4 accuracy, misses, slowest swipes
 ```
 
-To measure swipe typing on your own swipes, turn on "Log swipes to improve swipe typing" in settings. Each swipe is saved with the word you meant (the one you kept, the alternative you picked, or what you typed or swiped after undoing it) to `~/.local/share/nextkeybor/swipe-log.jsonl`, and `nextkeybord --swipe-bench` reads that file too.
+To measure swipe typing on your own swipes, turn on "Log swipes to improve swipe typing" in settings. Each swipe is saved with the word you meant (the one you kept, the alternative you picked, or what you typed or swiped after undoing it) to `~/.local/share/nextkeybor/swipe-log.jsonl`, with the two words before it and nothing more of what you wrote, and `nextkeybord --swipe-bench` reads that file too. Past 5 MB the log starts again, keeping the previous one as `swipe-log.old.jsonl`.
 
 ## Data and privacy
 

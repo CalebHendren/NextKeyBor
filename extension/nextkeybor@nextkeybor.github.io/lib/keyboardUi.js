@@ -39,6 +39,8 @@ const SPLIT_CHECK_MS = 250;
 const MAX_DELETE_WORDS = 30;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
+// The last two words, and any space after them.
+const LOG_CONTEXT = /(?:\S+\s+){0,2}\S*$/u;
 // The word just finished with a space, for emoji suggestions.
 const FINISHED_WORD = /([\p{L}'’-]+) $/u;
 // A word finished with one of these is autocorrected.
@@ -1291,7 +1293,9 @@ export class KeyboardUi {
         const retry = this._swipeRetype;
         this._swipeRetype = null;
         this._commitToApp(text);
-        const log = this._settings.get_boolean('swipe-log') ? {keys, path, context, choices: words} : null;
+        // The matcher only looks at the previous word, so log no more than two.
+        const log = this._settings.get_boolean('swipe-log')
+            ? {keys, path, context: context.match(LOG_CONTEXT)[0], choices: words} : null;
         this._swipeResult = {text, lead, space, words: cased, picked: false, log, retry};
         this._autoSpace = !!space;
         if (shifted && !this._kb._latched)

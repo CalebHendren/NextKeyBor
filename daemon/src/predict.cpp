@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <glib/gstdio.h>
+
 #include "dbus_service.h"
 #include "util.h"
 
@@ -641,6 +643,7 @@ constexpr double kSwipeFreqWeight = 0.8;    // log word frequency against the pa
 constexpr double kSwipeNamePenalty = 2.0;   // capitalised words and acronyms the user never typed
 constexpr double kSwipeEndScale = 3.0;      // path before the first letter or after the last costs more
 constexpr double kSwipeTurnBonus = 2.0;     // letters tend to sit where the path turns or slows
+constexpr long kSwipeLogMax = 5 * 1024 * 1024;  // bytes of swipe-log.jsonl before it starts again
 
 // Squared distance from p to the segment ab.
 double seg_dist2(Point p, Point a, Point b) {
@@ -1348,6 +1351,10 @@ void init() {
             try {
                 std::string line = json::parse(entry).dump() + "\n";  // one line, whatever came in
                 std::string path = join_path(data_dir(), "swipe-log.jsonl");
+                // Past kSwipeLogMax the log starts again, keeping one old file.
+                GStatBuf st;
+                if (g_stat(path.c_str(), &st) == 0 && st.st_size > kSwipeLogMax)
+                    g_rename(path.c_str(), join_path(data_dir(), "swipe-log.old.jsonl").c_str());
                 if (FILE *f = fopen(path.c_str(), "a")) {
                     fwrite(line.data(), 1, line.size(), f);
                     fclose(f);

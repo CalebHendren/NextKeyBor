@@ -103,7 +103,7 @@
     <key name="swipe-log" type="b">
       <default>false</default>
       <summary>Keep a local log of swipes and the words they were meant to be</summary>
-      <description>Saved to ~/.local/share/nextkeybor/swipe-log.jsonl and never sent anywhere; used to measure and tune swipe typing.</description>
+      <description>Saved to ~/.local/share/nextkeybor/swipe-log.jsonl and never sent anywhere; used to measure and tune swipe typing. Each entry has the swipe, the word meant and the two words before it. Past 5 MB the file starts again, keeping the previous one as swipe-log.old.jsonl.</description>
     </key>
     <key name="clipboard-history" type="b">
       <default>true</default>
