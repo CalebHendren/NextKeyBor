@@ -1,0 +1,13 @@
+{
+  "name": "High contrast",
+  "background": "#000000",
+  "key": "#000000",
+  "special-key": "#000000",
+  "key-text": "#ffffff",
+  "accent": "#ffff00",
+  "accent-text": "#000000",
+  "key-border-width": 2,
+  "key-border-color": "#ffffff",
+  "key-shadow": false,
+  "font-weight": "bold"
+}

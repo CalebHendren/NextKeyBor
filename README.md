@@ -20,6 +20,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
   - the ?123 page stays up while you type digits and symbols, and a space takes you back to the letters
 - **Resizable:** drag the handle on top of the keyboard to set its height, separately for landscape and portrait.
 - **Floating keyboard:** switch it on from the keyboard button in the top bar (hold it for the menu) or in settings. The keyboard becomes a panel you drag by its top bar; it opens where you left it, whether you tap a text field or the top bar button, and its X closes it.
+- **Skins:** pick the keyboard's look under Appearance in settings: follow the shell theme, light, dark, high contrast, Nord, Catppuccin Mocha, or your wallpaper's colours through pywal or matugen. Make your own from a copy of any skin (see [Skins](#skins)); saved changes show on the keyboard straight away.
 - **Text editing:** the editing button swaps the keys for a panel with arrows (with Select on, they extend the selection), Home/End, select all, cut, copy, paste, undo, redo and delete. Arrows and delete repeat while held.
 - **Clipboard history:** the clipboard button lists the last 20 texts you copied; tap one to paste it, hold to pin it. Kept in memory only, never on disk, and passwords copied from password managers are skipped.
 - **Screenshots:** the camera button opens GNOME's screenshot tool (area, window or screen; picture or video).
@@ -62,6 +63,35 @@ GIF search works straight away through Openverse. For GIPHY or KLIPY results, ad
 For cloud dictation with GroqType, run `./install.sh --with-groqtype` (add `GROQ_API_KEY=...` in front to save your key). It downloads only GroqType's command-line tool, which needs no root; a full GroqType install works too.
 
 To uninstall, run `./install.sh --uninstall`.
+
+## Skins
+
+A skin is a JSON file in `~/.local/share/nextkeybor/skins/`. Every value is optional; colours are `#rgb`, `#rrggbb`, `#rrggbbaa` or `rgba(…)`, sizes are pixels:
+
+| Key | What it sets |
+|---|---|
+| `name` | name in the picker |
+| `background`, `background-image` | keyboard background; the image (absolute, `~/`, or relative to the skin file) covers it |
+| `key`, `key-text` | letter keys |
+| `special-key`, `special-key-text` | shift, backspace, enter, ?123 and the like |
+| `accent`, `accent-text` | caps lock and selected buttons (default: the system accent colour) |
+| `toolbar-text` | suggestion bar, toolbar and panels |
+| `key-radius`, `key-gap` | key corners, and the space between keys (stock: 8) |
+| `key-border-width`, `key-border-color`, `key-shadow` | key outline; `false` drops the shadow |
+| `font`, `font-weight` | font family; `normal` or `bold` |
+| `css` | extra CSS added after the rest |
+
+A `.css` file in the same folder works as a skin too, for full control (the keyboard is `#keyboard`, its keys `.keyboard-key`, NextKeyBor's parts `.nkb-*`). Settings → Appearance → Copy writes an editable copy of the chosen skin.
+
+To follow the wallpaper with [matugen](https://github.com/InioX/matugen), add this to `~/.config/matugen/config.toml`, run matugen, and pick "Wallpaper (matugen)":
+
+```toml
+[templates.nextkeybor]
+input_path = '~/.local/share/gnome-shell/extensions/nextkeybor@nextkeybor.github.io/templates/matugen.json'
+output_path = '~/.local/share/nextkeybor/skins/matugen.json'
+```
+
+With [pywal](https://github.com/dylanaraps/pywal), pick "Wallpaper (pywal)"; it reads `~/.cache/wal/colors.json` after each run of `wal`.
 
 ## Tuning suggestions and swipe typing
 

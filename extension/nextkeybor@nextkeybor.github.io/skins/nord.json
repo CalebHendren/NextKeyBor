@@ -1,0 +1,11 @@
+{
+  "name": "Nord",
+  "background": "#2e3440",
+  "key": "#3b4252",
+  "special-key": "#434c5e",
+  "key-text": "#eceff4",
+  "accent": "#88c0d0",
+  "accent-text": "#2e3440",
+  "key-radius": 6,
+  "key-shadow": false
+}

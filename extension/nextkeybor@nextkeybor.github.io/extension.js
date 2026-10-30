@@ -13,6 +13,7 @@ import {TapFix, closeKeyPopups, updateLevelFromHints} from './lib/fixes.js';
 import {SPLIT_AT, augmentRow, centreSpaceBar, numberRowFor, replaceWwwKey, rowWidth, splitRow} from './lib/holds.js';
 import {KeyboardUi, MAX_HEIGHT_RATIO} from './lib/keyboardUi.js';
 import {oneHandedWidth, splitGap} from './lib/layoutModes.js';
+import {SkinLoader} from './lib/skinLoader.js';
 
 // Earlier single-purpose fixes that NextKeyBor includes; running both would
 // open the keyboard twice.
@@ -34,6 +35,7 @@ export default class NextKeyBorExtension extends Extension {
         }
 
         this._floating = new Floating(this._settings);
+        this._skins = new SkinLoader(this._settings, this.dir);
         this._patchKeyboard();
         this._syncIndicator();
 
@@ -73,6 +75,8 @@ export default class NextKeyBorExtension extends Extension {
         this._unpatchKeyboard();
         this._floating.destroy();
         this._floating = null;
+        this._skins.destroy();
+        this._skins = null;
         this._rebuildKeys();
         Main.keyboard._keyboard?._relayout();
 

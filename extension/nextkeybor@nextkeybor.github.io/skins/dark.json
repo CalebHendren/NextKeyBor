@@ -1,0 +1,9 @@
+{
+  "name": "Dark",
+  "background": "#17181a",
+  "key": "#333438",
+  "special-key": "#25262a",
+  "key-text": "#e8eaed",
+  "key-radius": 8,
+  "key-shadow": false
+}

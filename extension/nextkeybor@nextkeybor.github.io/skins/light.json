@@ -1,0 +1,9 @@
+{
+  "name": "Light",
+  "background": "#e3e5e8",
+  "key": "#ffffff",
+  "special-key": "#c4c8ce",
+  "key-text": "#1f2023",
+  "toolbar-text": "#1f2023",
+  "key-radius": 8
+}

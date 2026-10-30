@@ -5,6 +5,8 @@ import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+import {appearancePage} from './lib/skinPrefs.js';
+
 const BUS_NAME = 'io.github.nextkeybor.Daemon';
 const OBJECT_PATH = '/io/github/nextkeybor/Daemon';
 
@@ -256,6 +258,9 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
         holds.add(spinRow(settings, 'height-portrait', 'Height in portrait', 15, 60,
             'Percent of the screen'));
         typing.add(holds);
+
+        // --- Appearance
+        window.add(appearancePage(window, settings, this.dir));
 
         // --- Dictation
         const speech = new Adw.PreferencesPage({title: 'Dictation', icon_name: 'audio-input-microphone-symbolic'});

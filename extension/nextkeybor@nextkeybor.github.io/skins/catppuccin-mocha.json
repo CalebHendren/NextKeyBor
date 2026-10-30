@@ -1,0 +1,12 @@
+{
+  "name": "Catppuccin Mocha",
+  "background": "#1e1e2e",
+  "key": "#313244",
+  "special-key": "#45475a",
+  "key-text": "#cdd6f4",
+  "accent": "#cba6f7",
+  "accent-text": "#1e1e2e",
+  "key-radius": 10,
+  "key-gap": 6,
+  "key-shadow": false
+}

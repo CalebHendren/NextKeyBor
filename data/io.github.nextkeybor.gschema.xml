@@ -132,6 +132,11 @@
       <default>'off'</default>
       <summary>One-handed mode: a narrower docked keyboard on the left or right edge</summary>
     </key>
+    <key name="skin" type="s">
+      <default>'shell'</default>
+      <summary>Keyboard skin</summary>
+      <description>'shell' follows the shell theme; a built-in skin (light, dark, high-contrast, nord, catppuccin-mocha); 'pywal' for pywal's colours; or 'user/FILE' for a .json or .css file in ~/.local/share/nextkeybor/skins.</description>
+    </key>
     <key name="float-x" type="d">
       <default>-1</default>
       <summary>Floating keyboard left edge, as a fraction of the screen width (-1: centred)</summary>
