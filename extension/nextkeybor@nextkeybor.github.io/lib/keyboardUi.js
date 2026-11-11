@@ -1059,9 +1059,11 @@ export class KeyboardUi {
     }
 
     _flushLearn() {
-        const text = this._pendingLearn.trim();
+        // Keep the space after the last word: the daemon drops a last word
+        // with nothing after it as unfinished.
+        const text = this._pendingLearn.trimStart();
         this._pendingLearn = '';
-        if (!text || !this._daemon.available || this._isPassword())
+        if (!text.trim() || !this._daemon.available || this._isPassword())
             return;
         this._daemon.learnText(text, '').catch(() => {});
     }
