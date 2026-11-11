@@ -3,7 +3,7 @@
 #   ./install.sh              build + install daemon, schema, services, extension
 #   ./install.sh --uninstall  remove everything this script installed
 #   ./install.sh --with-groqtype  also set up GroqType's CLI for cloud dictation
-#                             (optional; GROQ_API_KEY=... to save a key too)
+#                             (optional; asks for a Groq API key)
 set -euo pipefail
 
 cd "$(dirname "$(readlink -f "$0")")"
@@ -105,7 +105,7 @@ Gio.Settings.sync()
 PY
 
 if $WITH_GROQTYPE; then
-    tools/setup-groqtype.sh "${GROQ_API_KEY:-}"
+    tools/setup-groqtype.sh
 fi
 
 cat <<EOF

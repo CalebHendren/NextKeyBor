@@ -60,7 +60,7 @@ Then log out and back in. Download a speech model from the 🌐 button on the ke
 
 GIF search works straight away through Openverse. For GIPHY or KLIPY results, add a free API key: `gnome-extensions prefs nextkeybor@nextkeybor.github.io`.
 
-For cloud dictation with GroqType, run `./install.sh --with-groqtype` (add `GROQ_API_KEY=...` in front to save your key). It downloads only GroqType's command-line tool, which needs no root; a full GroqType install works too.
+For cloud dictation with GroqType, run `./install.sh --with-groqtype`; it asks for your Groq API key without showing it (or leave it blank and add it in settings later). It downloads only GroqType's command-line tool, at a pinned commit, which needs no root; a full GroqType install works too.
 
 To uninstall, run `./install.sh --uninstall`.
 

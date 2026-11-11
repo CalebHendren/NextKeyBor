@@ -18,6 +18,20 @@ const GROQTYPE_URL = 'https://github.com/dixonSolutions/GroqType';
 const GIPHY_KEY_URL = 'https://developers.giphy.com/dashboard/?create=true';
 const KLIPY_KEY_URL = 'https://partner.klipy.com/';
 
+// Puts the key in GroqType's config (which must exist), readable by the
+// user alone.
+function saveGroqKey(key) {
+    const path = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'groqtype', 'config.json']);
+    const [, bytes] = Gio.File.new_for_path(path).load_contents(null);
+    const config = JSON.parse(new TextDecoder().decode(bytes));
+    config.api_key = key;
+    const tmp = Gio.File.new_for_path(`${path}.tmp`);
+    const stream = tmp.replace(null, false, Gio.FileCreateFlags.PRIVATE | Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+    stream.write_all(new TextEncoder().encode(JSON.stringify(config, null, 2)), null);
+    stream.close(null);
+    tmp.move(Gio.File.new_for_path(path), Gio.FileCopyFlags.OVERWRITE, null, null);
+}
+
 // GroqType's CLI, wherever its installer put it.
 function groqtypePath() {
     const found = GLib.find_program_in_path('groqtype');
@@ -304,12 +318,23 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
             const key = groqKey.text.trim();
             if (!program || !key)
                 return;
-            const proc = Gio.Subprocess.new([program, 'config', 'api-key', key],
+            // Not `groqtype config api-key KEY`: a command line is visible to
+            // every user on the machine. GroqType creates its config, then
+            // the key goes into it here.
+            const proc = Gio.Subprocess.new([program, 'config-show'],
                 Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_PIPE);
             proc.communicate_utf8_async(null, null, (p, res) => {
                 const [, , err] = p.communicate_utf8_finish(res);
+                let error = p.get_successful() ? null : err?.trim() || 'groqtype failed';
+                if (!error) {
+                    try {
+                        saveGroqKey(key);
+                    } catch (e) {
+                        error = e.message;
+                    }
+                }
                 groqKey.text = '';
-                groqStatus.subtitle = p.get_successful() ? 'API key saved' : `Could not save the key: ${err?.trim()}`;
+                groqStatus.subtitle = error ? `Could not save the key: ${error}` : 'API key saved';
                 updateStatus();
             });
         });
