@@ -82,7 +82,8 @@ std::string ensure_model(const std::string &name) {
             run_on_main([what, f] {
                 Service::get().emit("DownloadProgress", g_variant_new("(sd)", what.c_str(), f));
             });
-        });
+        },
+        4LL << 30);  // large-v3 is 3.1 GB
     {
         std::lock_guard lock(g_download_mutex);
         g_downloading.erase(name);

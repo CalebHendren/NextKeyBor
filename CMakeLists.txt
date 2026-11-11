@@ -14,7 +14,7 @@ include(GNUInstallDirs)
 include(FetchContent)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0 gio-unix-2.0 glib-2.0)
-find_package(CURL REQUIRED)
+find_package(CURL 7.85 REQUIRED)  # CURLOPT_PROTOCOLS_STR
 find_package(Threads REQUIRED)
 
 FetchContent_Declare(json

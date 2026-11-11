@@ -203,13 +203,27 @@ void curl_init_once() {
     static CurlInit init;
 }
 
-size_t write_string(char *ptr, size_t size, size_t n, void *ud) {
-    static_cast<std::string *>(ud)->append(ptr, size * n);
-    return size * n;
-}
+// Returning less than was given makes curl fail with CURLE_WRITE_ERROR.
+struct Sink {
+    std::string *body = nullptr;
+    FILE *file = nullptr;
+    long long written = 0, max = 0;
+    bool too_big = false;
+};
 
-size_t write_file(char *ptr, size_t size, size_t n, void *ud) {
-    return fwrite(ptr, size, n, static_cast<FILE *>(ud)) * size;
+size_t write_sink(char *ptr, size_t size, size_t n, void *ud) {
+    auto *s = static_cast<Sink *>(ud);
+    size_t len = size * n;
+    if (s->written + static_cast<long long>(len) > s->max) {
+        s->too_big = true;
+        return 0;
+    }
+    s->written += static_cast<long long>(len);
+    if (s->body) {
+        s->body->append(ptr, len);
+        return len;
+    }
+    return fwrite(ptr, 1, len, s->file);
 }
 
 int progress_cb(void *ud, curl_off_t total, curl_off_t now, curl_off_t, curl_off_t) {
@@ -223,7 +237,11 @@ CURL *make_handle(const std::string &url) {
     curl_init_once();
     CURL *c = curl_easy_init();
     curl_easy_setopt(c, CURLOPT_URL, url.c_str());
+    // URLs come from API responses: never file://, ftp:// or plain http://.
+    curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, "https");
+    curl_easy_setopt(c, CURLOPT_REDIR_PROTOCOLS_STR, "https");
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_MAXREDIRS, 5L);
     // Wikimedia asks clients for a descriptive agent with a contact URL.
     curl_easy_setopt(c, CURLOPT_USERAGENT, "NextKeyBor/" NKB_VERSION " (https://github.com/dixonSolutions/NextKeyBor)");
     curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 15L);
@@ -232,8 +250,10 @@ CURL *make_handle(const std::string &url) {
     return c;
 }
 
-void finish(CURL *c, CURLcode rc, HttpResult &r) {
-    if (rc != CURLE_OK)
+void finish(CURL *c, CURLcode rc, HttpResult &r, const Sink &sink) {
+    if (sink.too_big)
+        r.error = "response larger than " + std::to_string(sink.max >> 20) + " MB";
+    else if (rc != CURLE_OK)
         r.error = curl_easy_strerror(rc);
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &r.status);
     char *ct = nullptr;
@@ -249,15 +269,18 @@ void finish(CURL *c, CURLcode rc, HttpResult &r) {
 
 HttpResult http_get(const std::string &url) {
     HttpResult r;
+    Sink sink{&r.body, nullptr, 0, kMaxResponseBytes};
     CURL *c = make_handle(url);
     curl_easy_setopt(c, CURLOPT_TIMEOUT, 30L);
-    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_string);
-    curl_easy_setopt(c, CURLOPT_WRITEDATA, &r.body);
-    finish(c, curl_easy_perform(c), r);
+    curl_easy_setopt(c, CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(sink.max));
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_sink);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &sink);
+    finish(c, curl_easy_perform(c), r, sink);
     return r;
 }
 
-HttpResult http_download(const std::string &url, const std::string &dest, ProgressFn progress) {
+HttpResult http_download(const std::string &url, const std::string &dest, ProgressFn progress,
+                         long long max_bytes) {
     HttpResult r;
     std::string part = dest + ".part";
     FILE *f = g_fopen(part.c_str(), "wb");
@@ -265,9 +288,11 @@ HttpResult http_download(const std::string &url, const std::string &dest, Progre
         r.error = "cannot write " + part;
         return r;
     }
+    Sink sink{nullptr, f, 0, max_bytes};
     CURL *c = make_handle(url);
-    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_file);
-    curl_easy_setopt(c, CURLOPT_WRITEDATA, f);
+    curl_easy_setopt(c, CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(max_bytes));
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_sink);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &sink);
     curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, 100L);
     curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, 60L);
     if (progress) {
@@ -277,7 +302,7 @@ HttpResult http_download(const std::string &url, const std::string &dest, Progre
     }
     CURLcode rc = curl_easy_perform(c);
     fclose(f);
-    finish(c, rc, r);
+    finish(c, rc, r, sink);
     if (r.error.empty())
         g_rename(part.c_str(), dest.c_str());
     else

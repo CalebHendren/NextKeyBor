@@ -49,10 +49,13 @@ struct HttpResult {
     bool ok() const { return error.empty() && status >= 200 && status < 300; }
 };
 using ProgressFn = std::function<void(double fraction)>;
+// HTTPS only, redirects included. Bodies past max_bytes fail the request.
+constexpr long long kMaxResponseBytes = 8LL << 20;    // API responses
+constexpr long long kMaxDownloadBytes = 64LL << 20;   // GIFs, stickers, word lists
 HttpResult http_get(const std::string &url);
 // Downloads to dest (via dest.part); progress is called from the worker thread.
 HttpResult http_download(const std::string &url, const std::string &dest,
-                         ProgressFn progress = nullptr);
+                         ProgressFn progress = nullptr, long long max_bytes = kMaxDownloadBytes);
 std::string url_escape(const std::string &s);
 
 // GSettings for io.github.nextkeybor, or nullptr when the schema is not installed.
