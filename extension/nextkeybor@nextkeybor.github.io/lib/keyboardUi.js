@@ -996,6 +996,12 @@ export class KeyboardUi {
             (hints & Clutter.InputContentHintFlags.SENSITIVE_DATA) !== 0;
     }
 
+    // Never learn from passwords or terminals: a sudo or ssh password prompt
+    // in a terminal is not marked as a password field.
+    _learnAllowed() {
+        return !this._isPassword() && !this._isTerminal() && this._settings.get_boolean('learn-words');
+    }
+
     _isTerminal() {
         if (this._ctrl?.purpose === Clutter.InputContentPurpose.TERMINAL)
             return true;
@@ -1044,7 +1050,7 @@ export class KeyboardUi {
             this._swipeRetype = null;
         }
         this._buffer = (this._buffer + str).slice(-MAX_BUFFER);
-        if (!this._isPassword() && this._settings.get_boolean('learn-words')) {
+        if (this._learnAllowed()) {
             this._pendingLearn += str;
             const words = this._pendingLearn.trim().split(/\s+/).length;
             if (/[.!?\n]\s*$/.test(this._pendingLearn) ||

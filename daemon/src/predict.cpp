@@ -1131,7 +1131,11 @@ void Model::learn(const std::string &text) {
     bool vocabulary_changed = false;
     std::string prev_key;
     for (const auto &w : words) {
-        if (g_utf8_strlen(w.c_str(), -1) > 40 || g_unichar_isdigit(g_utf8_get_char(w.c_str()))) {
+        // Words with digits are more often passwords, codes or IDs than words.
+        bool has_digit = false;
+        for (const gchar *p = w.c_str(); *p && !has_digit; p = g_utf8_next_char(p))
+            has_digit = g_unichar_isdigit(g_utf8_get_char(p));
+        if (g_utf8_strlen(w.c_str(), -1) > 40 || has_digit) {
             prev_key.clear();
             continue;
         }
