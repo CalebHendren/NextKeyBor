@@ -26,17 +26,23 @@ void Service::on_call(GDBusConnection *, const gchar *, const gchar *, const gch
     }
 }
 
-void Service::emit(const char *signal, GVariant *params) {
+void Service::emit(const char *signal, GVariant *params, const std::string &destination) {
     if (!conn_) {
         g_variant_unref(g_variant_ref_sink(params));
         return;
     }
     GError *err = nullptr;
-    if (!g_dbus_connection_emit_signal(conn_, nullptr, kObjectPath, kInterface, signal, params,
-                                       &err)) {
+    if (!g_dbus_connection_emit_signal(conn_, destination.empty() ? nullptr : destination.c_str(),
+                                       kObjectPath, kInterface, signal, params, &err)) {
         g_warning("emitting %s failed: %s", signal, err->message);
         g_error_free(err);
     }
+}
+
+bool Service::caller_is_shell(GDBusMethodInvocation *inv) const {
+    static const bool any = !g_strcmp0(g_getenv("NKB_ALLOW_ANY_CALLER"), "1");
+    const gchar *sender = g_dbus_method_invocation_get_sender(inv);
+    return any || (sender && !shell_owner_.empty() && shell_owner_ == sender);
 }
 
 void Service::start(bool replace, std::function<void(bool)> on_ready) {
@@ -63,6 +69,15 @@ void Service::start(bool replace, std::function<void(bool)> on_ready) {
                 return;
             }
             svc->conn_ = conn;
+            svc->shell_watch_ = g_bus_watch_name_on_connection(
+                conn, "org.gnome.Shell", G_BUS_NAME_WATCHER_FLAGS_NONE,
+                [](GDBusConnection *, const gchar *, const gchar *owner, gpointer self) {
+                    static_cast<Service *>(self)->shell_owner_ = owner;
+                },
+                [](GDBusConnection *, const gchar *, gpointer self) {
+                    static_cast<Service *>(self)->shell_owner_.clear();
+                },
+                svc, nullptr);
         },
         [](GDBusConnection *, const gchar *name, gpointer self) {
             g_message("owning %s", name);

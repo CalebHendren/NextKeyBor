@@ -281,13 +281,20 @@ struct Session {
 };
 
 Session *g_session = nullptr;
+// The shell connection that started the latest dictation: what is said goes
+// to it alone, not to every client on the bus.
+std::string g_client;
+
+void emit_dictation(const char *signal, GVariant *params) {
+    Service::get().emit(signal, params, g_client);
+}
 
 void emit_state(const std::string &id, const char *state) {
-    Service::get().emit("DictationState", g_variant_new("(ss)", id.c_str(), state));
+    emit_dictation("DictationState", g_variant_new("(ss)", id.c_str(), state));
 }
 
 void emit_error(const std::string &id, const std::string &msg) {
-    Service::get().emit("DictationError", g_variant_new("(ss)", id.c_str(), msg.c_str()));
+    emit_dictation("DictationError", g_variant_new("(ss)", id.c_str(), msg.c_str()));
 }
 
 void stop_capture(Session *s) {
@@ -324,7 +331,7 @@ void on_samples(Session *s, const float *data, size_t n) {
             double level = std::clamp((db + 60.0) / 60.0, 0.0, 1.0);
             s->level_samples = 0;
             s->level_sum = 0;
-            Service::get().emit("DictationLevel", g_variant_new("(d)", level));
+            emit_dictation("DictationLevel", g_variant_new("(d)", level));
             if (level >= kSpeechLevel) {
                 s->heard_speech = true;
                 s->quiet_seconds = 0;
@@ -404,7 +411,7 @@ void finish_session(bool transcribe_it) {
     if (!transcribe_it || s->pcm.size() < kRate / 4) {
         emit_state(s->id, "idle");
         if (transcribe_it)
-            Service::get().emit("DictationResult",
+            emit_dictation("DictationResult",
                                 g_variant_new("(sss)", s->id.c_str(), "", s->language.c_str()));
         delete s;
         g_session = nullptr;
@@ -436,14 +443,15 @@ void finish_session(bool transcribe_it) {
             if (!error.empty())
                 emit_error(id, error);
             else
-                Service::get().emit("DictationResult", g_variant_new("(sss)", id.c_str(),
+                emit_dictation("DictationResult", g_variant_new("(sss)", id.c_str(),
                                                                      text.c_str(), detected.c_str()));
             emit_state(id, "idle");
         });
     });
 }
 
-std::string start(std::string language) {
+std::string start(std::string language, const std::string &client) {
+    g_client = client;
     if (g_session)
         finish_session(false);
     if (language.empty())
@@ -534,15 +542,23 @@ void init() {
     auto &svc = Service::get();
 
     svc.on("StartDictation", [](GVariant *params, GDBusMethodInvocation *inv) {
+        if (!Service::get().caller_is_shell(inv)) {
+            reply_error(inv, "only GNOME Shell may use the microphone through NextKeyBor");
+            return;
+        }
         const gchar *lang;
         g_variant_get(params, "(&s)", &lang);
         if (*lang && !valid_language_code(lang)) {
             reply_error(inv, "invalid language code");
             return;
         }
-        reply_string(inv, start(lang));
+        reply_string(inv, start(lang, g_dbus_method_invocation_get_sender(inv)));
     });
     svc.on("StopDictation", [](GVariant *params, GDBusMethodInvocation *inv) {
+        if (!Service::get().caller_is_shell(inv)) {
+            reply_error(inv, "only GNOME Shell may use the microphone through NextKeyBor");
+            return;
+        }
         const gchar *id;
         g_variant_get(params, "(&s)", &id);
         if (g_session && (!*id || g_session->id == id))
@@ -550,6 +566,10 @@ void init() {
         reply_empty(inv);
     });
     svc.on("CancelDictation", [](GVariant *params, GDBusMethodInvocation *inv) {
+        if (!Service::get().caller_is_shell(inv)) {
+            reply_error(inv, "only GNOME Shell may use the microphone through NextKeyBor");
+            return;
+        }
         const gchar *id;
         g_variant_get(params, "(&s)", &id);
         if (g_session && (!*id || g_session->id == id))

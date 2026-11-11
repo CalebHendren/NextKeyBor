@@ -25,7 +25,9 @@
       <arg direction="out" type="s" name="status_json"/>
     </method>
 
-    <!-- ===== Speech to text (whisper.cpp) ===== -->
+    <!-- ===== Speech to text (whisper.cpp) =====
+         Only GNOME Shell (the owner of org.gnome.Shell) may call the dictation methods, and
+         the Dictation* signals go to the connection that started the dictation alone. -->
     <method name="StartDictation">
       <!-- language: "auto" or an ISO-639-1 code such as "en", "pl"; "" = use setting -->
       <arg direction="in" type="s" name="language"/>
