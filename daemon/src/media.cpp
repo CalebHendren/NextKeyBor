@@ -1,6 +1,7 @@
 #include "media.h"
 
 #include <algorithm>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -91,6 +92,17 @@ bool text_matches(const std::string &query, const json &item) {
         return true;
     std::string hay = fold(item.value("title", "") + " " + item.value("tags", ""));
     return std::all_of(toks.begin(), toks.end(), [&](const std::string &t) { return hay.find(t) != std::string::npos; });
+}
+
+// A file directly in the favourites folder, which we may delete.
+bool is_own_favorite_file(const std::string &path) {
+    if (path.empty())
+        return false;
+    gchar *dir = g_path_get_dirname(path.c_str()), *base = g_path_get_basename(path.c_str());
+    bool ours = data_dir("favorites") == dir && strcmp(base, ".") && strcmp(base, "..");
+    g_free(dir);
+    g_free(base);
+    return ours;
 }
 
 // ---- local state (main thread only) ----
@@ -420,11 +432,9 @@ void set_favorite(json item, bool fav) {
             if (it->value("id", "") != id)
                 continue;
             // Only delete our own copies, never a file from the user's library.
-            for (const char *k : {"file", "preview_file"}) {
-                std::string f = it->value(k, "");
-                if (!f.empty() && f.rfind(data_dir("favorites"), 0) == 0)
+            for (const char *k : {"file", "preview_file"})
+                if (std::string f = it->value(k, ""); is_own_favorite_file(f))
                     g_unlink(f.c_str());
-            }
             g_favorites.erase(it);
             break;
         }
@@ -436,11 +446,16 @@ void set_favorite(json item, bool fav) {
         return;
     item["favorite"] = true;
     item["added"] = g_get_real_time() / 1000000;
+    // The file paths are ours to fill in, never the caller's.
+    item.erase("file");
+    item.erase("preview_file");
     std::string source = item.value("source", "");
     if (source == "local") {
         for (const auto &l : g_library)
             if (l.value("id", "") == id)
                 item["file"] = l.value("file", "");
+        if (!item.contains("file"))
+            throw std::runtime_error("unknown library item " + id);
     } else {
         std::string url = item.value("url", ""), purl = item.value("preview_url", "");
         std::string base = join_path(data_dir("favorites"), sha1(id));
