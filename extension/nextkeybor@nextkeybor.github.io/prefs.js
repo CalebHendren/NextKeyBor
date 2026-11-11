@@ -221,7 +221,9 @@ export default class NextKeyBorPreferences extends ExtensionPreferences {
 
         const auto = new Adw.PreferencesGroup({
             title: 'Physical keyboard detection',
-            description: 'System-wide: the daemon watches all input devices and the tablet-mode switch.',
+            description: 'System-wide: the daemon watches all input devices and the tablet-mode switch. ' +
+                'Needs your account in the "input" group, which lets every program you run read all key presses ' +
+                '(passwords too); see the README before turning this on.',
         });
         auto.add(switchRow(settings, 'auto-toggle-osk', 'Automatic on-screen keyboard',
             'Enable it only when no physical keyboard is usable'));
