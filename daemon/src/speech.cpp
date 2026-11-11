@@ -31,24 +31,53 @@ struct ModelInfo {
     const char *name;
     int size_mb;
     bool multilingual;
+    const char *sha1;  // from whisper.cpp's models/README.md
 };
 
 const ModelInfo kModels[] = {
-    {"tiny", 75, true},        {"tiny.en", 75, false},
-    {"base", 142, true},       {"base.en", 142, false},
-    {"small", 466, true},      {"small.en", 466, false},
-    {"medium", 1500, true},    {"medium.en", 1500, false},
-    {"large-v3-turbo-q5_0", 547, true}, {"large-v3-turbo", 1620, true},
-    {"large-v3", 3100, true},
+    {"tiny", 75, true, "bd577a113a864445d4c299885e0cb97d4ba92b5f"},
+    {"tiny.en", 75, false, "c78c86eb1a8faa21b369bcd33207cc90d64ae9df"},
+    {"base", 142, true, "465707469ff3a37a2b9b8d8f89f2f99de7299dac"},
+    {"base.en", 142, false, "137c40403d78fd54d454da0f9bd998f78703390c"},
+    {"small", 466, true, "55356645c2b361a969dfd0ef2c5a50d530afd8d5"},
+    {"small.en", 466, false, "db8a495a91d927739e50b3fc1cc4c6b8f6c2d022"},
+    {"medium", 1500, true, "fd9727b6e1217c2f614f9b698455c4ffd82463b4"},
+    {"medium.en", 1500, false, "8c30f0e44ce9560643ebd10bbe50cd20eafd3723"},
+    {"large-v3-turbo-q5_0", 547, true, "e050f7970618a659205450ad97eb95a18d69c9ee"},
+    {"large-v3-turbo", 1620, true, "4af2b29d7ec73d781377bfd1758ca957a807e941"},
+    {"large-v3", 3100, true, "ad82bf6a9043ceed055076d0fd39f5f186ff8062"},
 };
+
+const ModelInfo *find_model(const std::string &name) {
+    for (const auto &m : kModels)
+        if (name == m.name)
+            return &m;
+    return nullptr;
+}
+
+// SHA-1 of a file, read in chunks (models are gigabytes); "" if unreadable.
+std::string file_sha1(const std::string &path) {
+    FILE *f = g_fopen(path.c_str(), "rb");
+    if (!f)
+        return "";
+    GChecksum *sum = g_checksum_new(G_CHECKSUM_SHA1);
+    std::vector<guchar> buf(1 << 20);
+    size_t n;
+    while ((n = fread(buf.data(), 1, buf.size(), f)) > 0)
+        g_checksum_update(sum, buf.data(), static_cast<gssize>(n));
+    bool ok = !ferror(f);
+    fclose(f);
+    std::string out = ok ? g_checksum_get_string(sum) : "";
+    g_checksum_free(sum);
+    return out;
+}
 
 std::string model_path(const std::string &name) {
     return join_path(data_dir("models"), "ggml-" + name + ".bin");
 }
 
 bool known_model(const std::string &name) {
-    return std::any_of(std::begin(kModels), std::end(kModels),
-                       [&](const ModelInfo &m) { return name == m.name; });
+    return find_model(name) != nullptr;
 }
 
 // ---- whisper context (worker threads only) ----
@@ -65,6 +94,11 @@ std::string ensure_model(const std::string &name) {
     std::string path = model_path(name);
     if (file_exists(path))
         return "";
+    // Only models we know the checksum of are downloaded (a model of another
+    // name can still be put in the models folder by hand).
+    const ModelInfo *info = find_model(name);
+    if (!info)
+        return "unknown model " + name;
     {
         std::lock_guard lock(g_download_mutex);
         if (g_downloading.count(name))
@@ -73,8 +107,9 @@ std::string ensure_model(const std::string &name) {
     }
     std::string what = "model:" + name;
     double last = -1;
+    std::string unverified = path + ".download";
     auto r = http_download(
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-" + name + ".bin", path,
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-" + name + ".bin", unverified,
         [what, &last](double f) {
             if (f - last < 0.01 && f < 1.0)
                 return;
@@ -89,6 +124,14 @@ std::string ensure_model(const std::string &name) {
         g_downloading.erase(name);
     }
     std::string msg = r.ok() ? "" : "download failed: " + r.error;
+    if (msg.empty()) {
+        if (file_sha1(unverified) == info->sha1) {
+            g_rename(unverified.c_str(), path.c_str());
+        } else {
+            g_unlink(unverified.c_str());
+            msg = "download failed: " + name + " does not match its checksum";
+        }
+    }
     run_on_main([what, msg] {
         Service::get().emit("DownloadFinished",
                             g_variant_new("(sbs)", what.c_str(), msg.empty(), msg.c_str()));
