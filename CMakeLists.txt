@@ -17,8 +17,10 @@ pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0 gio-unix-2.0 glib-2.0)
 find_package(CURL 7.85 REQUIRED)  # CURLOPT_PROTOCOLS_STR
 find_package(Threads REQUIRED)
 
+# Downloads are pinned by hash: a changed upstream file fails the build.
 FetchContent_Declare(json
   URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+  URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(json)
 
@@ -31,10 +33,11 @@ else()
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
   set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
   set(GGML_VULKAN ${NKB_WHISPER_VULKAN} CACHE BOOL "" FORCE)
+  # v1.9.4, by commit rather than by tag (tags can be moved).
   FetchContent_Declare(whisper
-    GIT_REPOSITORY https://github.com/ggml-org/whisper.cpp.git
-    GIT_TAG v1.9.4
-    GIT_SHALLOW TRUE
+    URL https://github.com/ggml-org/whisper.cpp/archive/927cfce34f31707e17f2bff35c349632fb9e2c3a.tar.gz
+    URL_HASH SHA256=41b664fee09e79176ac277b5237debec34f8d74af3c7d71f333f1ec67989ecde
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SYSTEM)
   FetchContent_MakeAvailable(whisper)
 endif()
