@@ -331,6 +331,10 @@ void init() {
     svc.on("InstallLanguage", [](GVariant *params, GDBusMethodInvocation *inv) {
         const gchar *code;
         g_variant_get(params, "(&s)", &code);
+        if (!valid_language_code(code)) {
+            reply_error(inv, "invalid language code");
+            return;
+        }
         install(code);
         reply_empty(inv);
     });

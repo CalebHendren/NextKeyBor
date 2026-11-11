@@ -35,6 +35,10 @@ std::string fold(const std::string &s);
 std::vector<std::string> split_words(const std::string &s);
 std::string trim(const std::string &s);
 std::string random_id();
+// A language code safe to put in a file name or URL: "en_US", "pt_BR",
+// "ca_ES-valencia", "sr@latin", "auto". Letters first, then letters, digits,
+// '_', '-' and '@'; no dots or slashes.
+bool valid_language_code(const std::string &code);
 
 // Blocking HTTP helpers for worker threads.
 struct HttpResult {

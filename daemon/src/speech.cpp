@@ -536,6 +536,10 @@ void init() {
     svc.on("StartDictation", [](GVariant *params, GDBusMethodInvocation *inv) {
         const gchar *lang;
         g_variant_get(params, "(&s)", &lang);
+        if (*lang && !valid_language_code(lang)) {
+            reply_error(inv, "invalid language code");
+            return;
+        }
         reply_string(inv, start(lang));
     });
     svc.on("StopDictation", [](GVariant *params, GDBusMethodInvocation *inv) {

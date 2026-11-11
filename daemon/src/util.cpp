@@ -1,5 +1,6 @@
 #include "util.h"
 
+#include <algorithm>
 #include <condition_variable>
 #include <deque>
 #include <fstream>
@@ -181,6 +182,13 @@ std::string random_id() {
     char buf[17];
     snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(rng()));
     return buf;
+}
+
+bool valid_language_code(const std::string &code) {
+    if (code.empty() || code.size() > 32 || !g_ascii_isalpha(code[0]))
+        return false;
+    return std::all_of(code.begin(), code.end(),
+                       [](char c) { return g_ascii_isalnum(c) || c == '_' || c == '-' || c == '@'; });
 }
 
 // ---- HTTP ----

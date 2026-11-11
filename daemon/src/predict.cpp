@@ -1185,6 +1185,9 @@ void Model::forget(const std::string &word) {
 Model &model_for(std::string lang) {
     if (lang.empty())
         lang = active_language();
+    // The code becomes part of file names and a download URL.
+    if (!valid_language_code(lang))
+        throw std::runtime_error("invalid language code");
     auto it = g_models.find(lang);
     if (it == g_models.end())
         it = g_models.emplace(lang, std::make_unique<Model>(lang)).first;
@@ -1194,12 +1197,17 @@ Model &model_for(std::string lang) {
 }  // namespace
 
 std::string active_language() {
-    if (g_active.empty())
+    if (g_active.empty()) {
         g_active = setting_string("active-language", "en_US");
+        if (!valid_language_code(g_active))
+            g_active = "en_US";
+    }
     return g_active;
 }
 
 void set_active_language(const std::string &code) {
+    if (!valid_language_code(code))
+        throw std::runtime_error("invalid language code");
     g_active = code;
     if (settings())
         g_settings_set_string(settings(), "active-language", code.c_str());
