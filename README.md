@@ -10,7 +10,7 @@ NextKeyBor adds these to GNOME's built-in on-screen keyboard (OSK):
 - **Autocorrect:** clear typos are fixed when you finish the word with a space or punctuation ("teh" → "the", "dont" → "don't", "alot" → "a lot"). Texting abbreviations such as "thx", "pls" and "jk" are left as typed. The fix shows in bold in the suggestion bar first. Backspace right after puts back what you typed, and that word is never corrected again. Passwords, terminals, web and email addresses are left alone.
 - **Emoji suggestions:** after a word with an emoji of its own, the suggestion bar offers it ("pizza" → 🍕, "thanks" → 🙏); tap to type it.
 - **Text shortcuts:** type a shortcut and a space to type its phrase ("omw" → "On my way!"). Edit them in settings.
-- **Swipe typing:** slide across the letters and lift; a fading trail follows your finger. The best match is typed, the other matches wait in the suggestion bar, and backspace right after removes the whole word. Matching copes with how real fingers swipe: rounded corners, aiming off-centre, overshooting the last letter.
+- **Swipe typing:** slide across the letters and lift; a fading trail follows your finger. The best match is typed, the other matches wait in the suggestion bar, and backspace right after removes the whole word. Type the word yourself after undoing a swipe twice and it joins the dictionary, so names such as "Balatro" swipe from then on. Matching copes with how real fingers swipe: rounded corners, aiming off-centre, overshooting the last letter.
 - **Phone-keyboard touches:**
   - a pressed key shows its character above your finger
   - slide along the space bar to move the cursor

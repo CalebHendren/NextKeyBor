@@ -37,6 +37,9 @@ const DOUBLE_SPACE_MS = 1000;
 const BOUNCE_MARGIN_MS = 30;
 const SPLIT_CHECK_MS = 250;
 const MAX_DELETE_WORDS = 30;
+// Typing the same word in place of an undone swipe this many times adds it
+// to the dictionary: names the swipe cannot find, such as "Balatro".
+const SWIPE_RETYPE_LEARN = 2;
 
 const WORD_TAIL = /[\p{L}\p{N}_'’-]*$/u;
 // The last two words, and any space after them.
@@ -128,7 +131,8 @@ export class KeyboardUi {
         this.extraHeight = 0;
 
         this._swipeResult = null; // {text, lead, space, words, picked, log, retry} of the last swiped word
-        this._swipeRetype = null; // log entry of an undone swipe, waiting for the word typed instead
+        this._swipeRetype = null; // {word, log} of an undone swipe, waiting for the word typed instead
+        this._retyped = new Map(); // word -> times typed in place of an undone swipe
         this._keyQueue = [];
         this._keyQueueId = 0;
         this._a11yKeyboard = new Gio.Settings({schema_id: 'org.gnome.desktop.a11y.keyboard'});
@@ -1032,10 +1036,11 @@ export class KeyboardUi {
     _onTextCommitted(str) {
         this._lastCommitTime = GLib.get_monotonic_time();
         // The first word finished after an undone swipe is what it meant.
-        if (this._swipeRetype && /^[\s.,!?;:]/u.test(str)) {
-            const word = lastWord(this._buffer);
+        const end = this._swipeRetype ? str.search(/[\s.,!?;:]/u) : -1;
+        if (end >= 0) {
+            const word = lastWord(this._buffer + str.slice(0, end));
             if (word)
-                this._logSwipe(this._swipeRetype, word, 'retyped');
+                this._onSwipeRetyped(this._swipeRetype, word);
             this._swipeRetype = null;
         }
         this._buffer = (this._buffer + str).slice(-MAX_BUFFER);
@@ -1292,7 +1297,7 @@ export class KeyboardUi {
         const space = this._settings.get_boolean('auto-space') ? ' ' : '';
         const text = lead + cased[0] + space;
         // Swiping again after undoing one: that swipe meant this one's word.
-        const retry = this._swipeRetype;
+        const retry = this._swipeRetype?.log ?? null;
         this._swipeRetype = null;
         this._commitToApp(text);
         // The matcher only looks at the previous word, so log no more than two.
@@ -1318,7 +1323,23 @@ export class KeyboardUi {
         const r = this._swipeResult;
         this._swipeResult = null;
         this._replaceBeforeCursor([...r.text].length - [...r.lead].length, '');
-        this._swipeRetype = r.log ?? r.retry;
+        this._swipeRetype = {word: r.words[0], log: r.log ?? r.retry};
+    }
+
+    // word was typed in place of the undone swipe retype: after a few times,
+    // add it to the dictionary so the next swipe can find it.
+    _onSwipeRetyped(retype, word) {
+        if (retype.log)
+            this._logSwipe(retype.log, word, 'retyped');
+        if (word.toLowerCase() === retype.word.toLowerCase() || this._isPassword())
+            return;
+        const times = (this._retyped.get(word) ?? 0) + 1;
+        if (times < SWIPE_RETYPE_LEARN) {
+            this._retyped.set(word, times);
+            return;
+        }
+        this._retyped.delete(word);
+        this._daemon.acceptWord(word).catch(() => {});
     }
 
     // The swiped word stays: log what the swipe meant (setting swipe-log).
